@@ -1,0 +1,26 @@
+name: ujian_kita_test
+description: Android test client for token-based Google Form exam sessions.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  crypto: ^3.0.6
+  csv: ^6.0.0
+  device_info_plus: ^11.2.0
+  flutter:
+    sdk: flutter
+  flutter_windowmanager_plus: ^1.1.1
+  http: ^1.2.2
+  shared_preferences: ^2.3.3
+  webview_flutter: ^4.10.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

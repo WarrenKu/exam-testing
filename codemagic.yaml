@@ -1,0 +1,17 @@
+workflows:
+  android-test-apk:
+    name: UjianKita Test APK
+    max_build_duration: 60
+    environment:
+      flutter: stable
+    scripts:
+      - name: Create Android platform files
+        script: |
+          rm -rf android
+          flutter create --platforms=android --project-name ujian_kita_test .
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Build test APK
+        script: flutter build apk --debug
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
