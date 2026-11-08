@@ -2120,23 +2120,96 @@ const _identityListener = r'''
 (() => {
   if (window.__ujianKitaIdentityReady) return;
   window.__ujianKitaIdentityReady = true;
-  const normalize = (value) => value.toLowerCase().replace(/[^a-z]/g, '');
-  const classify = (label) => {
-    const value = normalize(label);
-    if (value.includes('nama')) return 'name';
-    if (value.includes('kelas')) return 'class';
+
+  const normalize = (val) => (val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const classify = (text) => {
+    const clean = normalize(text);
+    if (clean.includes('nama') || clean.includes('name') || clean.includes('peserta') || clean.includes('siswa')) return 'name';
+    if (clean.includes('kelas') || clean.includes('class') || clean.includes('rombel') || clean.includes('tingkat') || clean.includes('grade')) return 'class';
     return null;
   };
-  const report = (element) => {
-    const container = element.closest('[role="listitem"]') || element.parentElement;
-    const key = classify(container ? container.innerText : '');
-    if (!key || !element.value) return;
-    window.UjianKita.postMessage(JSON.stringify({ key, value: element.value }));
+
+  const report = (key, value) => {
+    if (!key || !value) return;
+    const cleanVal = value.trim();
+    if (!cleanVal) return;
+    try {
+      if (window.UjianKita && window.UjianKita.postMessage) {
+        window.UjianKita.postMessage(JSON.stringify({ key, value: cleanVal }));
+      }
+    } catch (_) {}
   };
-  document.querySelectorAll('input, textarea, select').forEach((element) => {
-    element.addEventListener('input', () => report(element));
-    element.addEventListener('change', () => report(element));
-  });
+
+  const scan = () => {
+    try {
+      // Pindai semua kontainer pertanyaan di Google Form
+      const questions = document.querySelectorAll('[role="listitem"], .Qr7Oae, .geS5n, .m7WMo');
+      questions.forEach((q) => {
+        const headingEl = q.querySelector('[role="heading"], .M7eMe, .HoXoMd, .z12JJ');
+        const headingText = headingEl ? (headingEl.innerText || headingEl.textContent) : (q.innerText || '');
+        const key = classify(headingText);
+        if (!key) return;
+
+        // A. Cek Input Teks (Nama atau Kelas yang diketik)
+        const textInput = q.querySelector('input[type="text"], input:not([type]), textarea');
+        if (textInput && textInput.value && textInput.value.trim().length > 0) {
+          report(key, textInput.value);
+        }
+
+        // B. Cek Radio Button Pilihan (Google Form role="radio")
+        const checkedRadio = q.querySelector('[role="radio"][aria-checked="true"]');
+        if (checkedRadio) {
+          const val = checkedRadio.getAttribute('data-value') ||
+                      checkedRadio.getAttribute('aria-label') ||
+                      checkedRadio.innerText;
+          if (val && val.trim().length > 0) {
+            report(key, val);
+          }
+        }
+
+        // C. Cek Dropdown Google Form (role="option" yang terpilih atau span label)
+        const selectedOption = q.querySelector('[role="option"][aria-selected="true"], .isSelected');
+        if (selectedOption) {
+          const val = selectedOption.getAttribute('data-value') || selectedOption.innerText;
+          if (val && val.trim().length > 0 && !val.toLowerCase().includes('pilih')) {
+            report(key, val);
+          }
+        }
+        const dropdownText = q.querySelector('.vRMGwf.oJeWuf');
+        if (dropdownText && dropdownText.innerText) {
+          const val = dropdownText.innerText.trim();
+          if (val && !val.toLowerCase().includes('pilih')) {
+            report(key, val);
+          }
+        }
+
+        // D. Cek Hidden Input entry Google Form yang terisi
+        const hiddenInputs = q.querySelectorAll('input[type="hidden"]');
+        hiddenInputs.forEach((h) => {
+          if (h.name && h.name.startsWith('entry.') && !h.name.endsWith('_sentinel') && h.value && h.value.trim().length > 0) {
+            report(key, h.value);
+          }
+        });
+      });
+    } catch (_) {}
+  };
+
+  // Listeners untuk menangkap ketikan, klik pilihan radio, maupun perubahan dropdown
+  document.addEventListener('input', scan, true);
+  document.addEventListener('change', scan, true);
+  document.addEventListener('click', () => {
+    setTimeout(scan, 80);
+    setTimeout(scan, 300);
+  }, true);
+
+  // Interval otomatis setiap 1.5 detik agar selalu sinkron
+  setInterval(scan, 1500);
+
+  // Jalankan segera saat halaman selesai dimuat
+  setTimeout(scan, 300);
+  setTimeout(scan, 1000);
+  setTimeout(scan, 2500);
 })();
 ''';
 
