@@ -2060,6 +2060,91 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                   ),
               ],
             ),
+            if (!_locked && _webError == null)
+              Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color.fromRGBO(15, 23, 42, 0.64),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: Colors.white),
+                              tooltip: 'Kembali',
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              onPressed: () async {
+                                if (await _webController.canGoBack()) {
+                                  await _webController.goBack();
+                                }
+                              },
+                            ),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                setState(() => _isLoadingWeb = true);
+                                _webController.reload();
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.refresh_rounded, size: 17, color: Colors.white),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Refresh',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.white),
+                              tooltip: 'Maju',
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              onPressed: () async {
+                                if (await _webController.canGoForward()) {
+                                  await _webController.goForward();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (_locked)
               Positioned.fill(
                 child: ColoredBox(
