@@ -713,28 +713,35 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   }
 
   Future<void> _confirmExit() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF18181C),
+        backgroundColor: isDark ? const Color(0xFF18181C) : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withOpacity(0.15)),
+          side: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.1)),
         ),
-        title: const Text('Keluar dari Ujian?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text(
+        title: Text(
+          'Selesaikan Ujian?',
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
           'Pastikan kamu sudah menekan tombol "Kirim" / "Submit" pada Google Form sebelum keluar.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal', style: TextStyle(color: Colors.white60)),
+            child: Text('Batal', style: TextStyle(color: isDark ? Colors.white60 : Colors.black54)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Ya, Selesai Ujian'),
+            child: const Text('Ya, Selesai'),
           ),
         ],
       ),
@@ -761,6 +768,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   }
 
   void _showStatsDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final activeDuration = DateTime.now().difference(_sessionStartTime);
 
     showDialog<void>(
@@ -775,12 +783,14 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
             child: Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: const Color(0xE6141418),
+                color: isDark ? const Color(0xE6141418) : Colors.white.withOpacity(0.96),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.18)),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.1),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withOpacity(isDark ? 0.5 : 0.12),
                     blurRadius: 30,
                     offset: const Offset(0, 10),
                   ),
@@ -795,36 +805,43 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1D4ED8).withOpacity(0.3),
+                          color: const Color(0xFF1D4ED8).withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
                         ),
-                        child: const Icon(Icons.analytics_outlined, color: Color(0xFF60A5FA), size: 22),
+                        child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 22),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Statistik Sesi Ujian',
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              'Informasi',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               'EXAMBRO SMAN18 BATAM',
-                              style: TextStyle(color: Colors.white54, fontSize: 12),
+                              style: TextStyle(
+                                color: isDark ? Colors.white54 : Colors.black54,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
+                        icon: Icon(Icons.close, color: isDark ? Colors.white70 : Colors.black54),
                         onPressed: () => Navigator.of(ctx).pop(),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Divider(color: Colors.white.withOpacity(0.1), height: 1),
+                  Divider(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08), height: 1),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -833,7 +850,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           icon: Icons.timer_outlined,
                           title: 'Durasi Aktif',
                           value: _formatDuration(activeDuration),
-                          accentColor: const Color(0xFF38BDF8),
+                          accentColor: const Color(0xFF0284C7),
+                          isDark: isDark,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -842,7 +860,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           icon: Icons.access_time,
                           title: 'Waktu Saat Ini',
                           value: _formatCurrentTime(),
-                          accentColor: const Color(0xFFA78BFA),
+                          accentColor: const Color(0xFF7C3AED),
+                          isDark: isDark,
                         ),
                       ),
                     ],
@@ -855,7 +874,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           icon: Icons.device_thermostat_outlined,
                           title: 'Suhu HP',
                           value: '${_deviceTemp > 0 ? _deviceTemp.toStringAsFixed(1) : '33.5'} °C',
-                          accentColor: const Color(0xFFFBBF24),
+                          accentColor: const Color(0xFFD97706),
+                          isDark: isDark,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -864,7 +884,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           icon: Icons.wifi,
                           title: 'Jaringan',
                           value: _networkName,
-                          accentColor: const Color(0xFF34D399),
+                          accentColor: const Color(0xFF059669),
+                          isDark: isDark,
                         ),
                       ),
                     ],
@@ -877,7 +898,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           icon: _isCharging ? Icons.battery_charging_full : Icons.battery_std,
                           title: 'Baterai',
                           value: '${_batteryLevel >= 0 ? _batteryLevel : 100}% ${_isCharging ? '⚡' : ''}',
-                          accentColor: const Color(0xFF4ADE80),
+                          accentColor: const Color(0xFF16A34A),
+                          isDark: isDark,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -886,7 +908,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           icon: Icons.warning_amber_rounded,
                           title: 'Total Pelanggaran',
                           value: '$_leaveCount / 3',
-                          accentColor: _leaveCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF9CA3AF),
+                          accentColor: _leaveCount > 0 ? const Color(0xFFEF4444) : (isDark ? const Color(0xFF9CA3AF) : Colors.black45),
+                          isDark: isDark,
                         ),
                       ),
                     ],
@@ -896,21 +919,33 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      border: Border.all(
+                        color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.06),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Peserta: $_name · $_className',
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text(
+                          'Peserta: $_name · $_className',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(height: 3),
-                        Text('Mapel: ${widget.exam.subject}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(
+                          'Mapel: ${widget.exam.subject}',
+                          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12),
+                        ),
                         const SizedBox(height: 3),
-                        Text('Perangkat: $_deviceLabel',
-                            style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                        Text(
+                          'Perangkat: $_deviceLabel',
+                          style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11),
+                        ),
                       ],
                     ),
                   ),
@@ -920,7 +955,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                     height: 44,
                     child: FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
+                        backgroundColor: const Color(0xFF1D4ED8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       onPressed: () => Navigator.of(ctx).pop(),
@@ -936,105 +971,16 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     );
   }
 
-  void _showGlisseMenu() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xF218181C),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.55),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 6, bottom: 12),
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    _GlisseMenuItem(
-                      icon: Icons.info_outline_rounded,
-                      label: 'Informasi & Statistik Ujian',
-                      subtitle: 'Durasi aktif, suhu, baterai, pelanggaran',
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        _showStatsDialog();
-                      },
-                    ),
-                    _GlisseMenuItem(
-                      icon: Icons.push_pin_outlined,
-                      label: 'Sematkan Layar (Pin App)',
-                      subtitle: 'Kunci layar agar fokus ke lembar ujian',
-                      onTap: () async {
-                        Navigator.of(ctx).pop();
-                        final res = await KioskService.startLockTask();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(res ? 'Layar berhasil disematkan.' : 'Mode kunci layar aktif.'),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: Divider(color: Colors.white.withOpacity(0.1), height: 1),
-                    ),
-                    _GlisseMenuItem(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Selesaikan & Keluar Ujian',
-                      subtitle: 'Pastikan sudah menekan Submit di form',
-                      isDestructive: true,
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        _confirmExit();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final subjectTitle = widget.exam.subject.isEmpty ? 'Ujian' : widget.exam.subject;
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         body: SafeArea(
           child: Stack(
             children: [
@@ -1042,7 +988,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                 children: [
                   // ==========================================
                   // GLISSE TOP BAR (Diletakkan di ATAS layer ujian)
-                  // Menghilangkan masalah tombol tertutup/kepotong di bawah
+                  // Tampilan default putih / terang, tidak menutupi form bawah
                   // ==========================================
                   Container(
                     margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
@@ -1064,13 +1010,14 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                         }
                       },
                       onReload: () => _webController.reload(),
-                      onMenu: _showGlisseMenu,
+                      onExit: _confirmExit,
+                      onInfo: _showStatsDialog,
                     ),
                   ),
 
                   if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 2.5),
 
-                  // LAYER GOOGLE FORM (100% Bersih dari tombol melayang di bawah)
+                  // LAYER GOOGLE FORM (100% Bersih dari tombol di bawah)
                   if (_webError != null)
                     Expanded(
                       child: Center(
@@ -1150,6 +1097,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
 }
 
 /// Bilah Navigasi Atas Bergaya Glisse Liquid Glass Asli
+/// Mendukung tema putih (default) dan tema gelap
 class GlisseTopBar extends StatelessWidget {
   const GlisseTopBar({
     super.key,
@@ -1160,7 +1108,8 @@ class GlisseTopBar extends StatelessWidget {
     required this.onBack,
     required this.onForward,
     required this.onReload,
-    required this.onMenu,
+    required this.onExit,
+    required this.onInfo,
   });
 
   final String subject;
@@ -1170,10 +1119,13 @@ class GlisseTopBar extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onForward;
   final VoidCallback onReload;
-  final VoidCallback onMenu;
+  final VoidCallback onExit;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
@@ -1182,12 +1134,15 @@ class GlisseTopBar extends StatelessWidget {
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: const Color(0xEB16161A),
+            color: isDark ? const Color(0xEB16161A) : Colors.white.withOpacity(0.92),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.2),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.1),
+              width: 1.2,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.35),
+                color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
                 blurRadius: 18,
                 offset: const Offset(0, 4),
               ),
@@ -1198,9 +1153,11 @@ class GlisseTopBar extends StatelessWidget {
               // Navigation Capsule (< > ↻)
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1209,20 +1166,23 @@ class GlisseTopBar extends StatelessWidget {
                       icon: Icons.chevron_left_rounded,
                       isEnabled: canGoBack,
                       tooltip: 'Kembali',
+                      isDark: isDark,
                       onTap: canGoBack ? onBack : null,
                     ),
-                    Container(width: 1, height: 16, color: Colors.white12),
+                    Container(width: 1, height: 16, color: isDark ? Colors.white12 : Colors.black12),
                     _GlisseIconButton(
                       icon: Icons.chevron_right_rounded,
                       isEnabled: canGoForward,
                       tooltip: 'Maju',
+                      isDark: isDark,
                       onTap: canGoForward ? onForward : null,
                     ),
-                    Container(width: 1, height: 16, color: Colors.white12),
+                    Container(width: 1, height: 16, color: isDark ? Colors.white12 : Colors.black12),
                     _GlisseIconButton(
                       icon: Icons.refresh_rounded,
                       isEnabled: true,
                       tooltip: 'Muat ulang',
+                      isDark: isDark,
                       onTap: onReload,
                     ),
                   ],
@@ -1238,8 +1198,8 @@ class GlisseTopBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.3,
@@ -1249,42 +1209,145 @@ class GlisseTopBar extends StatelessWidget {
 
               const SizedBox(width: 8),
 
-              // Violation Badge
+              // Violation Badge (Score)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: leaveCount > 0 ? const Color(0xFFEF4444).withOpacity(0.25) : Colors.white.withOpacity(0.08),
+                  color: leaveCount > 0
+                      ? const Color(0xFFEF4444).withOpacity(0.18)
+                      : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: leaveCount > 0 ? const Color(0xFFEF4444).withOpacity(0.4) : Colors.white.withOpacity(0.1),
+                    color: leaveCount > 0
+                        ? const Color(0xFFEF4444).withOpacity(0.4)
+                        : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
                   ),
                 ),
                 child: Text(
-                  '$leaveCount/3',
+                  'Keluar: $leaveCount/3',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: leaveCount > 0 ? const Color(0xFFFCA5A5) : Colors.white70,
+                    color: leaveCount > 0
+                        ? const Color(0xFFEF4444)
+                        : (isDark ? Colors.white70 : Colors.black54),
                   ),
                 ),
               ),
 
               const SizedBox(width: 6),
 
-              // Menu Button Titik Tiga (...)
+              // Button Keluar di samping Score (Selesai Ujian)
               InkWell(
-                onTap: onMenu,
+                onTap: onExit,
                 borderRadius: BorderRadius.circular(18),
                 child: Container(
-                  width: 36,
-                  height: 36,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
+                    color: const Color(0xFFEF4444).withOpacity(0.12),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.18)),
+                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
                   ),
                   child: const Center(
-                    child: Icon(Icons.more_horiz_rounded, size: 20, color: Colors.white),
+                    child: Icon(Icons.exit_to_app_rounded, size: 18, color: Color(0xFFEF4444)),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              // Menu Button Titik Tiga (...) dengan popup persis Kelvin Zhang Glisse Menu
+              Theme(
+                data: Theme.of(context).copyWith(
+                  cardColor: isDark ? const Color(0xFF1E2024) : Colors.white,
+                  popupMenuTheme: PopupMenuThemeData(
+                    color: isDark ? const Color(0xFF1E2024) : Colors.white,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 12,
+                    shadowColor: Colors.black.withOpacity(isDark ? 0.6 : 0.15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
+                      ),
+                    ),
+                  ),
+                ),
+                child: PopupMenuButton<String>(
+                  tooltip: 'Menu',
+                  offset: const Offset(0, 42),
+                  onSelected: (value) {
+                    if (value == 'info') {
+                      onInfo();
+                    } else if (value == 'exit') {
+                      onExit();
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    PopupMenuItem<String>(
+                      value: 'info',
+                      height: 42,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 19,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Informasi',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
+                    const PopupMenuItem<String>(
+                      value: 'exit',
+                      height: 42,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.exit_to_app_rounded,
+                            size: 19,
+                            color: Color(0xFFEF4444),
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Selesai',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFEF4444),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.06),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.1),
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.more_horiz_rounded,
+                        size: 19,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1301,65 +1364,33 @@ class _GlisseIconButton extends StatelessWidget {
     required this.icon,
     required this.isEnabled,
     required this.tooltip,
+    required this.isDark,
     this.onTap,
   });
 
   final IconData icon;
   final bool isEnabled;
   final String tooltip;
+  final bool isDark;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    Color iconColor;
+    if (isEnabled) {
+      iconColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    } else {
+      iconColor = isDark ? Colors.white24 : Colors.black26;
+    }
+
     return IconButton(
       visualDensity: VisualDensity.compact,
       padding: const EdgeInsets.all(4),
       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       icon: Icon(icon, size: 18),
-      color: isEnabled ? Colors.white : Colors.white24,
+      color: iconColor,
       tooltip: tooltip,
       onPressed: onTap,
-    );
-  }
-}
-
-class _GlisseMenuItem extends StatelessWidget {
-  const _GlisseMenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.subtitle,
-    this.isDestructive = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final VoidCallback onTap;
-  final bool isDestructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isDestructive ? const Color(0xFFEF4444) : Colors.white;
-
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isDestructive ? const Color(0xFFEF4444).withOpacity(0.15) : Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isDestructive ? const Color(0xFFEF4444).withOpacity(0.2) : Colors.white.withOpacity(0.1)),
-        ),
-        child: Icon(icon, color: color, size: 20),
-      ),
-      title: Text(
-        label,
-        style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w600),
-      ),
-      subtitle: subtitle != null
-          ? Text(subtitle!, style: TextStyle(color: isDestructive ? const Color(0xFFEF4444).withOpacity(0.8) : Colors.white54, fontSize: 11))
-          : null,
-      onTap: onTap,
     );
   }
 }
@@ -1370,21 +1401,25 @@ class _StatCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.accentColor,
+    required this.isDark,
   });
 
   final IconData icon;
   final String title;
   final String value;
   final Color accentColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.06),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1396,7 +1431,10 @@ class _StatCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                  style: TextStyle(
+                    color: isDark ? Colors.white60 : Colors.black54,
+                    fontSize: 11,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1406,8 +1444,8 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
               fontSize: 15,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.2,
