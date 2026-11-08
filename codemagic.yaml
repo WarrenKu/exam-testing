@@ -5,10 +5,13 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Create Android platform files
+      - name: Setup Android platform files
         script: |
-          rm -rf android
-          flutter create --platforms=android --org id.ujian_kita --project-name ujian_kita_sman18 .
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android --org id.ujian_kita --project-name ujian_kita_sman18 .
+          fi
+          mkdir -p android/app/src/main/kotlin/id/ujian_kita/app
+          cp android-template/MainActivity.kt android/app/src/main/kotlin/id/ujian_kita/app/MainActivity.kt
           cp android-template/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
       - name: Install dependencies
         script: flutter pub get
