@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:csv/csv.dart';
@@ -593,8 +594,630 @@ class TestModeNotice extends StatelessWidget {
   }
 }
 
-class InformationPage extends StatelessWidget {
+class TelegramDevService {
+  static const String botToken =
+      '9254314814:AAHAxgoS9MyRVZJC2OFacgkpUqmlmW62XdU';
+  static const String botUsername = 'desxam_bot';
+
+  static Future<bool> sendMessage(String chatId, String message) async {
+    try {
+      final res = await http.post(
+        Uri.parse('https://api.telegram.org/bot$botToken/sendMessage'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'chat_id': chatId,
+          'text': message,
+        }),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getUpdates({int? offset}) async {
+    try {
+      final url = offset != null
+          ? 'https://api.telegram.org/bot$botToken/getUpdates?offset=$offset&timeout=1'
+          : 'https://api.telegram.org/bot$botToken/getUpdates?timeout=1';
+      final res = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['ok'] == true && data['result'] is List) {
+          return List<Map<String, dynamic>>.from(data['result']);
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+}
+
+class DeveloperModeSection extends StatefulWidget {
+  const DeveloperModeSection({super.key});
+
+  @override
+  State<DeveloperModeSection> createState() => _DeveloperModeSectionState();
+}
+
+class _DeveloperModeSectionState extends State<DeveloperModeSection> {
+  bool _isConnected = false;
+  bool _isWaitingConnection = false;
+  String? _telegramId;
+  String? _telegramUsername;
+  String? _telegramName;
+
+  bool _isSendingOtp = false;
+  bool _showOtpInput = false;
+  String? _currentOtp;
+  String? _otpError;
+  bool _isDevUnlocked = false;
+
+  Timer? _pollingTimer;
+  int? _lastUpdateId;
+
+  final _c1 = TextEditingController();
+  final _c2 = TextEditingController();
+  final _c3 = TextEditingController();
+  final _c4 = TextEditingController();
+
+  final _f1 = FocusNode();
+  final _f2 = FocusNode();
+  final _f3 = FocusNode();
+  final _f4 = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _isConnected = prefs.getBool('dev_telegram_connected') ?? false;
+          _telegramId = prefs.getString('dev_telegram_id');
+          _telegramUsername = prefs.getString('dev_telegram_username');
+          _telegramName = prefs.getString('dev_telegram_name');
+          _isDevUnlocked = prefs.getBool('dev_mode_unlocked') ?? false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    _c1.dispose();
+    _c2.dispose();
+    _c3.dispose();
+    _c4.dispose();
+    _f1.dispose();
+    _f2.dispose();
+    _f3.dispose();
+    _f4.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startConnectTelegram() async {
+    setState(() {
+      _isWaitingConnection = true;
+      _otpError = null;
+    });
+
+    final sessionCode = (100000 + Random().nextInt(900000)).toString();
+
+    // Inisialisasi offset agar pesan lama tidak terbaca ulang
+    final initialUpdates = await TelegramDevService.getUpdates();
+    if (initialUpdates.isNotEmpty) {
+      _lastUpdateId = (initialUpdates.last['update_id'] as int) + 1;
+    }
+
+    final botUrl =
+        'https://t.me/${TelegramDevService.botUsername}?start=$sessionCode';
+    await KioskService.openUrl(botUrl);
+
+    _pollingTimer?.cancel();
+    int polls = 0;
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      polls++;
+      if (polls > 45) {
+        timer.cancel();
+        if (mounted) {
+          setState(() {
+            _isWaitingConnection = false;
+            _otpError = 'Waktu tunggu habis. Tekan Hubungkan lagi.';
+          });
+        }
+        return;
+      }
+
+      final updates = await TelegramDevService.getUpdates(offset: _lastUpdateId);
+      for (final update in updates) {
+        _lastUpdateId = (update['update_id'] as int) + 1;
+        final msg = update['message'];
+        if (msg != null) {
+          final text = (msg['text'] ?? '').toString();
+          if (text.startsWith('/start')) {
+            timer.cancel();
+
+            final chatId = msg['chat']['id'].toString();
+            final from = msg['from'] ?? {};
+            final username = (from['username'] ?? '').toString();
+            final firstName = (from['first_name'] ?? 'Developer').toString();
+
+            // Kirim pesan sambutan pertama kali
+            await TelegramDevService.sendMessage(
+              chatId,
+              '🤖 Bot telah berhasil terhubung dengan perangkat Developer!\n\n'
+              'Nama: $firstName\n'
+              'ID Telegram: $chatId\n\n'
+              'Silakan kembali ke aplikasi UjianKita untuk verifikasi OTP.',
+            );
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('dev_telegram_id', chatId);
+            await prefs.setString('dev_telegram_username', username);
+            await prefs.setString('dev_telegram_name', firstName);
+            await prefs.setBool('dev_telegram_connected', true);
+
+            if (mounted) {
+              setState(() {
+                _isWaitingConnection = false;
+                _isConnected = true;
+                _telegramId = chatId;
+                _telegramUsername = username;
+                _telegramName = firstName;
+                _otpError = null;
+              });
+            }
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _sendOtp() async {
+    if (_telegramId == null) return;
+    setState(() {
+      _isSendingOtp = true;
+      _otpError = null;
+    });
+
+    final otp = (1000 + Random().nextInt(9000)).toString();
+    _currentOtp = otp;
+
+    final ok = await TelegramDevService.sendMessage(
+      _telegramId!,
+      'One try code (kode sekali pake): $otp',
+    );
+
+    if (mounted) {
+      setState(() {
+        _isSendingOtp = false;
+        if (ok) {
+          _showOtpInput = true;
+          _c1.clear();
+          _c2.clear();
+          _c3.clear();
+          _c4.clear();
+        } else {
+          _otpError = 'Gagal mengirim pesan OTP ke Telegram. Coba lagi.';
+        }
+      });
+      if (ok) {
+        Future.delayed(const Duration(milliseconds: 350), () {
+          if (mounted) _f1.requestFocus();
+        });
+      }
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final entered = '${_c1.text}${_c2.text}${_c3.text}${_c4.text}'.trim();
+    if (entered.length < 4) {
+      setState(() => _otpError = 'Ketik lengkap 4 digit OTP.');
+      return;
+    }
+
+    if (entered == _currentOtp) {
+      _currentOtp = null; // Sekali pakai
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('dev_mode_unlocked', true);
+
+      await TelegramDevService.sendMessage(
+        _telegramId!,
+        'Verifikasi OTP Berhasil!\n\nMode Pengembang telah aktif di perangkat Anda.',
+      );
+
+      if (mounted) {
+        setState(() {
+          _isDevUnlocked = true;
+          _otpError = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mode Pengembang berhasil diaktifkan!'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _otpError = 'Kode OTP salah. Periksa pesan di Telegram.';
+      });
+    }
+  }
+
+  Future<void> _disconnect() async {
+    _pollingTimer?.cancel();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('dev_telegram_id');
+    await prefs.remove('dev_telegram_username');
+    await prefs.remove('dev_telegram_name');
+    await prefs.remove('dev_telegram_connected');
+    await prefs.remove('dev_mode_unlocked');
+
+    setState(() {
+      _isConnected = false;
+      _isWaitingConnection = false;
+      _telegramId = null;
+      _telegramUsername = null;
+      _telegramName = null;
+      _isDevUnlocked = false;
+      _showOtpInput = false;
+      _currentOtp = null;
+      _otpError = null;
+    });
+  }
+
+  Widget _buildOtpBox(
+    TextEditingController controller,
+    FocusNode currentFocus,
+    FocusNode? nextFocus,
+    FocusNode? prevFocus, {
+    bool isLast = false,
+  }) {
+    return SizedBox(
+      width: 52,
+      height: 56,
+      child: TextField(
+        controller: controller,
+        focusNode: currentFocus,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        maxLength: 1,
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        decoration: InputDecoration(
+          counterText: '',
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        onChanged: (val) {
+          if (val.isNotEmpty) {
+            if (nextFocus != null) {
+              nextFocus.requestFocus();
+            } else if (isLast) {
+              _verifyOtp();
+            }
+          } else if (val.isEmpty && prevFocus != null) {
+            prevFocus.requestFocus();
+          }
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFCBD5E1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.terminal_rounded, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text(
+                'Mode Pengembang (Developer)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const Spacer(),
+              if (_isDevUnlocked)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16A34A).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Aktif',
+                    style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Kondisi 1: Belum terhubung Telegram
+          if (!_isConnected) ...[
+            const Text(
+              'Tekan tombol di bawah untuk membuka @desxam_bot di Telegram lalu klik START untuk menghubungkan akun Telegram Anda.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            if (_isWaitingConnection) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Menunggu Anda menekan START di bot Telegram...',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _startConnectTelegram,
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Buka Telegram Lagi'),
+                ),
+              ),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: FilledButton.icon(
+                  onPressed: _startConnectTelegram,
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: const Text('Hubungkan ke Telegram (@desxam_bot)'),
+                ),
+              ),
+            ],
+            if (_otpError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _otpError!,
+                style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+              ),
+            ],
+          ]
+
+          // Kondisi 2: Terhubung ke Telegram
+          else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16A34A).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF16A34A),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Terhubung dengan Telegram',
+                        style: TextStyle(
+                          color: Color(0xFF16A34A),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        onTap: _disconnect,
+                        child: const Text(
+                          'Putuskan',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 11,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'ID Telegram: ${_telegramId ?? '-'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  if (_telegramUsername != null && _telegramUsername!.isNotEmpty)
+                    Text(
+                      'Username: @$_telegramUsername',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  if (_telegramName != null && _telegramName!.isNotEmpty)
+                    Text(
+                      'Nama: $_telegramName',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            if (!_isDevUnlocked) ...[
+              if (!_showOtpInput)
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: FilledButton.icon(
+                    onPressed: _isSendingOtp ? null : _sendOtp,
+                    icon: _isSendingOtp
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.key_rounded, size: 18),
+                    label: Text(_isSendingOtp ? 'Mengirim OTP...' : 'Send OTP (4 Digit)'),
+                  ),
+                ),
+
+              // Animasi 0.5 detik saat memunculkan 4 section input & button
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 500),
+                crossFadeState: _showOtpInput
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                firstChild: const SizedBox.shrink(),
+                secondChild: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Ketik 4 digit OTP yang dikirim bot Telegram:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildOtpBox(_c1, _f1, _f2, null),
+                        const SizedBox(width: 8),
+                        _buildOtpBox(_c2, _f2, _f3, _f1),
+                        const SizedBox(width: 8),
+                        _buildOtpBox(_c3, _f3, _f4, _f2),
+                        const SizedBox(width: 8),
+                        _buildOtpBox(_c4, _f4, null, _f3, isLast: true),
+                      ],
+                    ),
+                    if (_otpError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _otpError!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isSendingOtp ? null : _sendOtp,
+                            child: const Text('Kirim Ulang OTP', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _verifyOtp,
+                            child: const Text('Verifikasi', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Akses Pengembang Aktif. Perangkat ini telah terverifikasi oleh akun Telegram Developer.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class InformationPage extends StatefulWidget {
   const InformationPage({super.key});
+
+  @override
+  State<InformationPage> createState() => _InformationPageState();
+}
+
+class _InformationPageState extends State<InformationPage> {
+  int _versionTapCount = 0;
+  DateTime? _lastTapTime;
+  bool _isDevPanelVisible = false;
+
+  void _onVersionTap() {
+    final now = DateTime.now();
+    if (_lastTapTime == null ||
+        now.difference(_lastTapTime!) > const Duration(seconds: 2)) {
+      _versionTapCount = 1;
+    } else {
+      _versionTapCount++;
+    }
+    _lastTapTime = now;
+
+    if (_versionTapCount == 5) {
+      _versionTapCount = 0;
+      HapticFeedback.lightImpact();
+      setState(() {
+        _isDevPanelVisible = !_isDevPanelVisible;
+      });
+    }
+  }
 
   Future<void> _openDeveloperUrl(BuildContext context) async {
     const url = 'https://github.com/WarrenKu';
@@ -665,11 +1288,27 @@ class InformationPage extends StatelessWidget {
           onTap: () => _openDeveloperUrl(context),
         ),
 
-        // Versi Aplikasi
-        const ListTile(
-          leading: Icon(Icons.info_outline_rounded),
-          title: Text('Versi Aplikasi'),
-          subtitle: Text('v1.0.0 (Build 1) - Release SMAN18 Batam'),
+        // Versi Aplikasi dengan easter egg 5x tap tanpa efek visual ketukan
+        InkWell(
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          focusColor: Colors.transparent,
+          onTap: _onVersionTap,
+          child: const ListTile(
+            leading: Icon(Icons.info_outline_rounded),
+            title: Text('Versi Aplikasi'),
+            subtitle: Text('v1.0.0 (Build 1) - Release SMAN18 Batam'),
+          ),
+        ),
+
+        // Menu tampilan yang nempel di bawah version setelah ditekan 5x
+        AnimatedSize(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOutCubic,
+          child: _isDevPanelVisible
+              ? const DeveloperModeSection()
+              : const SizedBox.shrink(),
         ),
 
         // Status Koneksi API (untuk Dashboard Super-Admin nanti)
