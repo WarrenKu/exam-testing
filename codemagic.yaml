@@ -11,7 +11,8 @@ workflows:
           flutter create --platforms=android --org id.ujian_kita --project-name ujian_kita_sman18 .
           cp android-template/MainActivity.kt android/app/src/main/kotlin/id/ujian_kita/ujian_kita_sman18/MainActivity.kt
           cp android-template/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-          python3 -c "p='android/gradle/wrapper/gradle-wrapper.properties'; open(p,'w').write(open(p).read().replace('-all.zip','-bin.zip'))" || true
+          python3 -c "p='android/gradle/wrapper/gradle-wrapper.properties'; s=open(p).read().replace('-all.zip','-bin.zip'); open(p,'w').write(s)"
+          cat android/gradle/wrapper/gradle-wrapper.properties
       - name: Install dependencies
         script: flutter pub get
       - name: Build test APK
