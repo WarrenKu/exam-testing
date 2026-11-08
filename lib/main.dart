@@ -504,32 +504,34 @@ class _ExamShellState extends State<ExamShell> {
         child: pages[_selectedIndex],
       ),
       bottomNavigationBar: widget.useGlassBar
-          ? SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: LiquidGlassBar(
-                  items: const [
-                    LiquidGlassBarItem(
-                      iconData: Icons.home_rounded,
-                      label: 'Beranda',
-                    ),
-                    LiquidGlassBarItem(
-                      iconData: Icons.info_outline_rounded,
-                      label: 'Informasi',
-                    ),
-                    LiquidGlassBarItem(
-                      iconData: Icons.settings_rounded,
-                      label: 'Pengaturan',
-                    ),
-                  ],
-                  currentIndex: _selectedIndex,
-                  onTap: (index) => setState(() => _selectedIndex = index),
-                  style: const LiquidGlassBarStyle(
-                    height: 60.0,
-                    borderRadius: 32.0,
-                    activeColor: Colors.white,
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: LiquidGlassBar(
+                items: const [
+                  LiquidGlassBarItem(
+                    iconData: Icons.home_rounded,
+                    label: 'Beranda',
                   ),
+                  LiquidGlassBarItem(
+                    iconData: Icons.info_outline_rounded,
+                    label: 'Informasi',
+                  ),
+                  LiquidGlassBarItem(
+                    iconData: Icons.settings_rounded,
+                    label: 'Pengaturan',
+                  ),
+                ],
+                currentIndex: _selectedIndex,
+                onTap: (index) => setState(() => _selectedIndex = index),
+                style: LiquidGlassBarStyle(
+                  height: 60.0,
+                  borderRadius: 32.0,
+                  activeColor: widget.isDark
+                      ? Colors.white
+                      : const Color(0xFF0F172A),
+                  inactiveColor: widget.isDark
+                      ? Colors.white60
+                      : const Color(0xFF64748B),
                 ),
               ),
             )
@@ -1670,15 +1672,12 @@ class SettingsPage extends StatelessWidget {
             children: [
               const Icon(Icons.developer_mode_rounded, color: Colors.blueAccent, size: 20),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Opsi Pengembang (Developer)',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueAccent,
-                      ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Text(
+                'Opsi Pengembang',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueAccent,
+                    ),
               ),
             ],
           ),
@@ -1686,10 +1685,8 @@ class SettingsPage extends StatelessWidget {
           SwitchListTile(
             value: devModeUnlocked,
             onChanged: onDevModeUnlockedChanged,
-            title: const Text('Mode Pengembang Aktif'),
-            subtitle: const Text(
-              'Matikan untuk menonaktifkan dan menyembunyikan semua opsi pengembang.',
-            ),
+            title: const Text('Mode Pengembang'),
+            subtitle: const Text('Pengembang debug sistem'),
           ),
           SwitchListTile(
             value: devAntiScreenshot,
