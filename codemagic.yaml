@@ -19,9 +19,6 @@ workflows:
         script: flutter pub get
       - name: Build test APK
         script: |
-          flutter build apk --debug --android-skip-build-dependency-validation || true
-          mkdir -p build/app/outputs/flutter-apk
-          find build -name "*.apk" -exec cp {} build/app/outputs/flutter-apk/ \;
-          ls -la build/app/outputs/flutter-apk/
+          flutter build apk --debug --android-skip-build-dependency-validation
     artifacts:
       - build/**/outputs/**/*.apk

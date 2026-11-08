@@ -96,7 +96,7 @@ class MainActivity : FlutterActivity() {
                 map["isCharging"] = false
                 map["temperature"] = 0.0
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             map["batteryLevel"] = -1
             map["isCharging"] = false
             map["temperature"] = 0.0
@@ -132,7 +132,7 @@ class MainActivity : FlutterActivity() {
             } else {
                 map["network"] = "Tidak diketahui"
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             map["network"] = "Tidak diketahui"
         }
 
@@ -145,7 +145,7 @@ class MainActivity : FlutterActivity() {
                 false
             }
             map["isPinned"] = isPinned
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             map["isPinned"] = false
         }
 
