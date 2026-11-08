@@ -1944,6 +1944,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
         if (data['key'] == 'name') _name = value;
         if (data['key'] == 'class') _className = value;
       });
+      debugPrint('Sesi Terdeteksi: $_name ($_className) - $_deviceLabel');
     } catch (_) {}
   }
 
@@ -2024,22 +2025,6 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
           children: [
             Column(
               children: [
-                Material(
-                  color: theme.colorScheme.secondaryContainer,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(
-                      'Sesi: $_name · $_className · $_deviceLabel',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
                 if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 3),
                 if (_webError != null)
                   Expanded(
@@ -2118,15 +2103,31 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
 
 const _identityListener = r'''
 (() => {
-  if (window.__ujianKitaIdentityReady) return;
+  if (window.__ujianKitaIdentityReady) {
+    if (typeof window.__ujianKitaScan === 'function') window.__ujianKitaScan();
+    return;
+  }
   window.__ujianKitaIdentityReady = true;
 
   const normalize = (val) => (val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const classify = (text) => {
     const clean = normalize(text);
-    if (clean.includes('nama') || clean.includes('name') || clean.includes('peserta') || clean.includes('siswa')) return 'name';
-    if (clean.includes('kelas') || clean.includes('class') || clean.includes('rombel') || clean.includes('tingkat') || clean.includes('grade')) return 'class';
+    // Abaikan nomor ujian, nomor peserta, token, atau judul soal
+    if (clean.includes('nomor') || clean.includes('nopeserta') || clean.includes('noujian') || clean.includes('token') || clean.includes('kartu') || clean.includes('soal')) {
+      return null;
+    }
+    // Cek Kelas terlebih dahulu (misal: "Kelas", "KELAS", "Tingkat", "Rombel")
+    if (clean.includes('kelas') || clean.includes('class') || clean.includes('rombel') || clean.includes('tingkat') || clean.includes('grade')) {
+      return 'class';
+    }
+    // Cek Nama (misal: "Nama", "NAMA SISWA", "Nama Lengkap Peserta Ujian", "NAMA LENGKAP")
+    if (clean.includes('nama') || clean.includes('name')) {
+      return 'name';
+    }
+    if ((clean.includes('siswa') || clean.includes('peserta')) && !clean.includes('ujian')) {
+      return 'name';
+    }
     return null;
   };
 
@@ -2161,6 +2162,7 @@ const _identityListener = r'''
         const checkedRadio = q.querySelector('[role="radio"][aria-checked="true"]');
         if (checkedRadio) {
           const val = checkedRadio.getAttribute('data-value') ||
+                      checkedRadio.getAttribute('data-answer-value') ||
                       checkedRadio.getAttribute('aria-label') ||
                       checkedRadio.innerText;
           if (val && val.trim().length > 0) {
@@ -2168,23 +2170,35 @@ const _identityListener = r'''
           }
         }
 
-        // C. Cek Dropdown Google Form (role="option" yang terpilih atau span label)
-        const selectedOption = q.querySelector('[role="option"][aria-selected="true"], .isSelected');
-        if (selectedOption) {
-          const val = selectedOption.getAttribute('data-value') || selectedOption.innerText;
-          if (val && val.trim().length > 0 && !val.toLowerCase().includes('pilih')) {
-            report(key, val);
-          }
-        }
-        const dropdownText = q.querySelector('.vRMGwf.oJeWuf');
-        if (dropdownText && dropdownText.innerText) {
-          const val = dropdownText.innerText.trim();
-          if (val && !val.toLowerCase().includes('pilih')) {
+        // C. Cek Checkbox Pilihan (Google Form role="checkbox")
+        const checkedBox = q.querySelector('[role="checkbox"][aria-checked="true"]');
+        if (checkedBox) {
+          const val = checkedBox.getAttribute('data-answer-value') ||
+                      checkedBox.getAttribute('data-value') ||
+                      checkedBox.getAttribute('aria-label') ||
+                      checkedBox.innerText;
+          if (val && val.trim().length > 0) {
             report(key, val);
           }
         }
 
-        // D. Cek Hidden Input entry Google Form yang terisi
+        // D. Cek Dropdown Google Form (role="option" yang terpilih atau span label)
+        const selectedOption = q.querySelector('[role="option"][aria-selected="true"], [role="option"].isSelected');
+        if (selectedOption) {
+          const val = selectedOption.getAttribute('data-value') || selectedOption.innerText;
+          if (val && val.trim().length > 0 && !val.trim().toLowerCase().startsWith('pilih') && !val.trim().toLowerCase().startsWith('choose')) {
+            report(key, val);
+          }
+        }
+        const dropdownTexts = q.querySelectorAll('.vRMGwf, [jsname="L9xktb"]');
+        dropdownTexts.forEach((el) => {
+          const val = (el.innerText || el.textContent || '').trim();
+          if (val && !val.toLowerCase().startsWith('pilih') && !val.toLowerCase().startsWith('choose')) {
+            report(key, val);
+          }
+        });
+
+        // E. Cek Hidden Input entry Google Form yang terisi
         const hiddenInputs = q.querySelectorAll('input[type="hidden"]');
         hiddenInputs.forEach((h) => {
           if (h.name && h.name.startsWith('entry.') && !h.name.endsWith('_sentinel') && h.value && h.value.trim().length > 0) {
@@ -2195,12 +2209,15 @@ const _identityListener = r'''
     } catch (_) {}
   };
 
-  // Listeners untuk menangkap ketikan, klik pilihan radio, maupun perubahan dropdown
+  window.__ujianKitaScan = scan;
+
+  // Listeners untuk menangkap ketikan, klik pilihan radio / checkbox, maupun perubahan dropdown
   document.addEventListener('input', scan, true);
   document.addEventListener('change', scan, true);
   document.addEventListener('click', () => {
     setTimeout(scan, 80);
     setTimeout(scan, 300);
+    setTimeout(scan, 800);
   }, true);
 
   // Interval otomatis setiap 1.5 detik agar selalu sinkron
