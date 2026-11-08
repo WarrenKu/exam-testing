@@ -142,51 +142,54 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 child: Image.asset(
                   'assets/sman18-batam.png',
-                  width: 140,
-                  height: 140,
+                  width: 90,
+                  height: 90,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
-                      width: 140,
-                      height: 140,
+                      width: 90,
+                      height: 90,
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(
-                        Icons.school,
-                        size: 72,
+                        Icons.school_rounded,
+                        size: 46,
                         color: theme.colorScheme.primary,
                       ),
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 24),
-              Text(
+              const SizedBox(height: 16),
+              const Text(
                 'EXAMBRO SMAN18 BATAM',
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.8,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 'dev by github/warrenku',
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: TextStyle(
+                  fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,
+                  letterSpacing: 0.2,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 28),
               const SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
               ),
             ],
           ),
