@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
-import 'package:glass_bottom_navigation/glass_bottom_navigation.dart';
+import 'package:liquid_glass_bar/liquid_glass_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -304,32 +304,19 @@ class _ExamShellState extends State<ExamShell> {
           ? SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: GlassBottomBar(
-                    items: const [
-                      GlassBarItem(
-                        icon: Icons.home_rounded,
-                        label: 'Beranda',
-                        nativeSymbolName: 'house.fill',
-                      ),
-                      GlassBarItem(
-                        icon: Icons.info_outline_rounded,
-                        label: 'Informasi',
-                        nativeSymbolName: 'info.circle',
-                      ),
-                      GlassBarItem(
-                        icon: Icons.settings_rounded,
-                        label: 'Pengaturan',
-                        nativeSymbolName: 'gearshape',
-                      ),
-                    ],
-                    currentIndex: _selectedIndex,
-                    onTap: (index) => setState(() => _selectedIndex = index),
-                    style: GlassBottomNavStyle(
-                      accent: Theme.of(context).colorScheme.primary,
-                    ),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                child: LiquidGlassBar(
+                  items: const [
+                    LiquidGlassBarItem(iconData: Icons.home_rounded, label: 'Beranda'),
+                    LiquidGlassBarItem(iconData: Icons.info_outline_rounded, label: 'Informasi'),
+                    LiquidGlassBarItem(iconData: Icons.settings_rounded, label: 'Pengaturan'),
+                  ],
+                  currentIndex: _selectedIndex,
+                  onTap: (index) => setState(() => _selectedIndex = index),
+                  style: const LiquidGlassBarStyle(
+                    height: 64.0,
+                    borderRadius: 32.0,
+                    activeColor: Color(0xFF10B981),
                   ),
                 ),
               ),
@@ -664,8 +651,8 @@ class SettingsPage extends StatelessWidget {
         SwitchListTile(
           value: useGlassBar,
           onChanged: onGlassBarChanged,
-          title: const Text('Bilah Navigasi Glass'),
-          subtitle: const Text('Efek kaca mengambang pada menu utama (Eksperimental).'),
+          title: const Text('Bilah Navigasi Liquid Glass'),
+          subtitle: const Text('Efek kaca cair mengambang pada menu utama (Eksperimental).'),
         ),
       ],
     );
