@@ -89,7 +89,7 @@ class UjianKitaApp extends StatefulWidget {
 class _UjianKitaAppState extends State<UjianKitaApp> {
   bool _isDark = false;
   bool _ignoreScheduleForTesting = true;
-  bool _useGlassBar = true;
+  bool _useGlassBar = false;
   bool _isReady = false;
 
   bool _devModeUnlocked = false;
@@ -116,7 +116,7 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
           // Setting reguler TETAP DISIMPAN (persisten)
           _useGlassBar = prefs.getBool('use_glass_bar') ??
               prefs.getBool('use_liquid_glass') ??
-              true;
+              false;
           _isDark = prefs.getBool('is_dark') ?? false;
           _ignoreScheduleForTesting =
               prefs.getBool('ignore_schedule_for_testing') ?? true;
