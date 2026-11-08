@@ -1,4 +1,4 @@
-package id.ujian_kita.app
+package id.ujian_kita.ujian_kita_sman18
 
 import android.app.ActivityManager
 import android.content.Context

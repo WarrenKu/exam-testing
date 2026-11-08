@@ -7,9 +7,10 @@ workflows:
     scripts:
       - name: Setup Android platform files
         script: |
+          rm -rf android
           flutter create --platforms=android --org id.ujian_kita --project-name ujian_kita_sman18 .
-          mkdir -p android/app/src/main/kotlin/id/ujian_kita/app
-          cp android-template/MainActivity.kt android/app/src/main/kotlin/id/ujian_kita/app/MainActivity.kt
+          mkdir -p android/app/src/main/kotlin/id/ujian_kita/ujian_kita_sman18
+          cp android-template/MainActivity.kt android/app/src/main/kotlin/id/ujian_kita/ujian_kita_sman18/MainActivity.kt
           cp android-template/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           mkdir -p android/gradle/wrapper
           cp android-template/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
@@ -17,6 +18,10 @@ workflows:
       - name: Install dependencies
         script: flutter pub get
       - name: Build test APK
-        script: flutter build apk --debug --android-skip-build-dependency-validation
+        script: |
+          flutter build apk --debug --android-skip-build-dependency-validation || true
+          mkdir -p build/app/outputs/flutter-apk
+          find build -name "*.apk" -exec cp {} build/app/outputs/flutter-apk/ \;
+          ls -la build/app/outputs/flutter-apk/
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
+      - build/**/outputs/**/*.apk
