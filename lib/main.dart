@@ -716,8 +716,11 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: const Color(0xFF18181C),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withOpacity(0.15)),
+        ),
         title: const Text('Keluar dari Ujian?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text(
           'Pastikan kamu sudah menekan tombol "Kirim" / "Submit" pada Google Form sebelum keluar.',
@@ -764,7 +767,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
@@ -772,9 +775,9 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
             child: Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: const Color(0xF018181C),
+                color: const Color(0xE6141418),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                border: Border.all(color: Colors.white.withOpacity(0.18)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.5),
@@ -792,8 +795,9 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1D4ED8).withOpacity(0.25),
+                          color: const Color(0xFF1D4ED8).withOpacity(0.3),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
                         ),
                         child: const Icon(Icons.analytics_outlined, color: Color(0xFF60A5FA), size: 22),
                       ),
@@ -819,8 +823,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
-                  const Divider(color: Colors.white12, height: 1),
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.white.withOpacity(0.1), height: 1),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -892,9 +896,9 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.04),
+                      color: Colors.white.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -949,7 +953,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                 decoration: BoxDecoration(
                   color: const Color(0xF218181C),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.14)),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.55),
@@ -961,7 +965,6 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Handle Bar
                     Center(
                       child: Container(
                         margin: const EdgeInsets.only(top: 6, bottom: 12),
@@ -1031,166 +1034,139 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     return PopScope(
       canPop: false,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(subjectTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          automaticallyImplyLeading: false,
-          actions: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: _leaveCount > 0 ? theme.colorScheme.errorContainer : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  'Keluar: $_leaveCount/3',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _leaveCount > 0 ? theme.colorScheme.onErrorContainer : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                Material(
-                  color: theme.colorScheme.secondaryContainer,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Text(
-                      'Sesi: $_name · $_className · $_deviceLabel',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.w500,
-                      ),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  // ==========================================
+                  // GLISSE TOP BAR (Diletakkan di ATAS layer ujian)
+                  // Menghilangkan masalah tombol tertutup/kepotong di bawah
+                  // ==========================================
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                    child: GlisseTopBar(
+                      subject: subjectTitle,
+                      canGoBack: _canGoBack,
+                      canGoForward: _canGoForward,
+                      leaveCount: _leaveCount,
+                      onBack: () async {
+                        if (await _webController.canGoBack()) {
+                          await _webController.goBack();
+                          _updateNavState();
+                        }
+                      },
+                      onForward: () async {
+                        if (await _webController.canGoForward()) {
+                          await _webController.goForward();
+                          _updateNavState();
+                        }
+                      },
+                      onReload: () => _webController.reload(),
+                      onMenu: _showGlisseMenu,
                     ),
                   ),
-                ),
-                if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 3),
-                if (_webError != null)
-                  Expanded(
+
+                  if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 2.5),
+
+                  // LAYER GOOGLE FORM (100% Bersih dari tombol melayang di bawah)
+                  if (_webError != null)
+                    Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                              const SizedBox(height: 12),
+                              Text(_webError!, textAlign: TextAlign.center),
+                              const SizedBox(height: 16),
+                              FilledButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _isLoadingWeb = true;
+                                    _webError = null;
+                                  });
+                                  _webController.reload();
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Coba Lagi'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: WebViewWidget(controller: _webController),
+                    ),
+                ],
+              ),
+
+              // Lock Overlay if 3 violations reached
+              if (_locked)
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: Colors.black.withOpacity(0.96),
                     child: Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(28),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-                            const SizedBox(height: 12),
-                            Text(_webError!, textAlign: TextAlign.center),
+                            const Icon(Icons.lock_outline, size: 56, color: Color(0xFFEF4444)),
                             const SizedBox(height: 16),
-                            FilledButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _isLoadingWeb = true;
-                                  _webError = null;
-                                });
-                                _webController.reload();
-                              },
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Coba Lagi'),
+                            const Text(
+                              'Sesi dikunci',
+                              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Aplikasi telah ditinggalkan tiga kali. Masukkan token lagi untuk memulai sesi uji baru.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 20),
+                            FilledButton(
+                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                              onPressed: _restartWithToken,
+                              child: const Text('Kembali ke token'),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  )
-                else
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 76),
-                      child: WebViewWidget(controller: _webController),
-                    ),
-                  ),
-              ],
-            ),
-
-            // Glisse Floating Bottom Bar (< > titik tiga)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: GlisseBottomBar(
-                  canGoBack: _canGoBack,
-                  canGoForward: _canGoForward,
-                  onBack: () async {
-                    if (await _webController.canGoBack()) {
-                      await _webController.goBack();
-                      _updateNavState();
-                    }
-                  },
-                  onForward: () async {
-                    if (await _webController.canGoForward()) {
-                      await _webController.goForward();
-                      _updateNavState();
-                    }
-                  },
-                  onReload: () => _webController.reload(),
-                  onMenu: _showGlisseMenu,
-                ),
-              ),
-            ),
-
-            // Lock Overlay if 3 violations reached
-            if (_locked)
-              Positioned.fill(
-                child: ColoredBox(
-                  color: theme.colorScheme.surface.withValues(alpha: 0.96),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock_outline, size: 56, color: theme.colorScheme.error),
-                          const SizedBox(height: 16),
-                          Text('Sesi dikunci', style: theme.textTheme.headlineSmall),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Aplikasi telah ditinggalkan tiga kali. Masukkan token lagi untuk memulai sesi uji baru.',
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 20),
-                          FilledButton(
-                            onPressed: _restartWithToken,
-                            child: const Text('Kembali ke token'),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Floating Navigation Bar terinspirasi dari Glisse (kelvinzhang.ca)
-class GlisseBottomBar extends StatelessWidget {
-  const GlisseBottomBar({
+/// Bilah Navigasi Atas Bergaya Glisse Liquid Glass Asli
+class GlisseTopBar extends StatelessWidget {
+  const GlisseTopBar({
     super.key,
+    required this.subject,
     required this.canGoBack,
     required this.canGoForward,
+    required this.leaveCount,
     required this.onBack,
     required this.onForward,
     required this.onReload,
     required this.onMenu,
   });
 
+  final String subject;
   final bool canGoBack;
   final bool canGoForward;
+  final int leaveCount;
   final VoidCallback onBack;
   final VoidCallback onForward;
   final VoidCallback onReload;
@@ -1199,65 +1175,116 @@ class GlisseBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          height: 54,
+          height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: const Color(0xE018181C),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white.withOpacity(0.16), width: 1),
+            color: const Color(0xEB16161A),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+                color: Colors.black.withOpacity(0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              // Back Button <
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                color: canGoBack ? Colors.white : Colors.white38,
-                tooltip: 'Kembali',
-                onPressed: canGoBack ? onBack : null,
+              // Navigation Capsule (< > ↻)
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _GlisseIconButton(
+                      icon: Icons.chevron_left_rounded,
+                      isEnabled: canGoBack,
+                      tooltip: 'Kembali',
+                      onTap: canGoBack ? onBack : null,
+                    ),
+                    Container(width: 1, height: 16, color: Colors.white12),
+                    _GlisseIconButton(
+                      icon: Icons.chevron_right_rounded,
+                      isEnabled: canGoForward,
+                      tooltip: 'Maju',
+                      onTap: canGoForward ? onForward : null,
+                    ),
+                    Container(width: 1, height: 16, color: Colors.white12),
+                    _GlisseIconButton(
+                      icon: Icons.refresh_rounded,
+                      isEnabled: true,
+                      tooltip: 'Muat ulang',
+                      onTap: onReload,
+                    ),
+                  ],
+                ),
               ),
-              Container(width: 1, height: 20, color: Colors.white12),
-              // Forward Button >
-              IconButton(
-                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
-                color: canGoForward ? Colors.white : Colors.white38,
-                tooltip: 'Maju',
-                onPressed: canGoForward ? onForward : null,
+
+              const SizedBox(width: 8),
+
+              // Title Subject
+              Expanded(
+                child: Text(
+                  subject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ),
-              Container(width: 1, height: 20, color: Colors.white12),
-              // Refresh Button
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                color: Colors.white70,
-                tooltip: 'Muat ulang',
-                onPressed: onReload,
+
+              const SizedBox(width: 8),
+
+              // Violation Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: leaveCount > 0 ? const Color(0xFFEF4444).withOpacity(0.25) : Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: leaveCount > 0 ? const Color(0xFFEF4444).withOpacity(0.4) : Colors.white.withOpacity(0.1),
+                  ),
+                ),
+                child: Text(
+                  '$leaveCount/3',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: leaveCount > 0 ? const Color(0xFFFCA5A5) : Colors.white70,
+                  ),
+                ),
               ),
-              Container(width: 1, height: 20, color: Colors.white12),
-              // Menu Button Titik Tiga ...
+
+              const SizedBox(width: 6),
+
+              // Menu Button Titik Tiga (...)
               InkWell(
                 onTap: onMenu,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(18),
+                    color: Colors.white.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.18)),
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.more_horiz_rounded, size: 22, color: Colors.white),
-                    ],
+                  child: const Center(
+                    child: Icon(Icons.more_horiz_rounded, size: 20, color: Colors.white),
                   ),
                 ),
               ),
@@ -1265,6 +1292,33 @@ class GlisseBottomBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _GlisseIconButton extends StatelessWidget {
+  const _GlisseIconButton({
+    required this.icon,
+    required this.isEnabled,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final bool isEnabled;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(4),
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      icon: Icon(icon, size: 18),
+      color: isEnabled ? Colors.white : Colors.white24,
+      tooltip: tooltip,
+      onPressed: onTap,
     );
   }
 }
@@ -1292,8 +1346,9 @@ class _GlisseMenuItem extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isDestructive ? const Color(0xFFEF4444).withOpacity(0.15) : Colors.white.withOpacity(0.06),
+          color: isDestructive ? const Color(0xFFEF4444).withOpacity(0.15) : Colors.white.withOpacity(0.08),
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isDestructive ? const Color(0xFFEF4444).withOpacity(0.2) : Colors.white.withOpacity(0.1)),
         ),
         child: Icon(icon, color: color, size: 20),
       ),
@@ -1327,9 +1382,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1351,7 +1406,7 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.bold,
