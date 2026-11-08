@@ -1,10 +1,11 @@
-# UjianKita Test APK
+# UjianKita SMAN18
 
-This is the student-side Android test client. It reads the existing public token sheet, validates an entered token, and opens the matching Google Form inside the app.
+This is the student-side Android test client for SMAN 18 Batam. It reads the existing public token sheet, lists every subject that uses the entered token, and opens the selected Google Form inside the app.
 
 ## Test behavior
 
 - Reads the columns `MAPEL`, `KELAS`, `SESI`, `TOKEN`, `DURASI`, `HARI`, and `LINK SOAL` from the supplied spreadsheet.
+- Uses the same token lookup as the original Kodular project: one token can return more than one subject, and the student chooses the intended subject/class before the Form opens.
 - Ignores empty token rows.
 - Starts with **Mode uji jadwal** enabled so test tokens work outside their scheduled day.
 - Reads name/class values entered on the first Google Form page when the field label contains `nama` or `kelas`.

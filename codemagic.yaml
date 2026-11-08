@@ -8,7 +8,8 @@ workflows:
       - name: Create Android platform files
         script: |
           rm -rf android
-          flutter create --platforms=android --project-name ujian_kita_test .
+          flutter create --platforms=android --org id.ujian_kita --project-name ujian_kita_sman18 .
+          cp android-template/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
       - name: Install dependencies
         script: flutter pub get
       - name: Build test APK

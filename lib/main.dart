@@ -9,8 +9,7 @@ import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
 
-const tokenSheetUrl =
-    'https://docs.google.com/spreadsheets/d/1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0/export?format=csv';
+const tokenSheetId = '1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0';
 
 void main() {
   runApp(const UjianKitaApp());
@@ -26,28 +25,29 @@ class UjianKitaApp extends StatefulWidget {
 class _UjianKitaAppState extends State<UjianKitaApp> {
   bool _isDark = false;
   bool _ignoreScheduleForTesting = true;
+  bool _isReady = false;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'UjianKita Test',
+      title: 'UjianKita SMAN18',
       themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
-      home: SplashScreen(
-        onReady: () => Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ExamShell(
+      home: _isReady
+          ? ExamShell(
               isDark: _isDark,
               ignoreScheduleForTesting: _ignoreScheduleForTesting,
               onThemeChanged: (value) => setState(() => _isDark = value),
               onTestingModeChanged: (value) =>
                   setState(() => _ignoreScheduleForTesting = value),
+            )
+          : SplashScreen(
+              onReady: () {
+                if (mounted) setState(() => _isReady = true);
+              },
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -88,17 +88,24 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.fact_check_rounded, size: 72, color: colors.primary),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/sman18-batam.png',
+                width: 116,
+                height: 116,
+                fit: BoxFit.cover,
+              ),
+            ),
             const SizedBox(height: 20),
-            Text('UjianKita', style: Theme.of(context).textTheme.headlineMedium),
+            Text('UjianKita SMAN18', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            Text('Memuat sesi ujian', style: Theme.of(context).textTheme.bodyLarge),
+            Text('Menyiapkan sesi ujian', style: Theme.of(context).textTheme.bodyLarge),
             const SizedBox(height: 28),
             const SizedBox(width: 28, height: 28, child: CircularProgressIndicator()),
           ],
@@ -199,23 +206,19 @@ class _TokenPageState extends State<TokenPage> {
       _message = null;
     });
     try {
-      final records = await TokenSheetRepository().load();
-      final exam = records.where((record) => record.token.toUpperCase() == enteredToken.toUpperCase()).firstOrNull;
-      if (exam == null) {
+      final exams = await TokenSheetRepository().loadByToken(enteredToken);
+      if (exams.isEmpty) {
         setState(() => _message = 'Token tidak ditemukan di jadwal ujian.');
-        return;
-      }
-      if (exam.formUrl.isEmpty) {
-        setState(() => _message = 'Token ditemukan, tetapi link soal belum tersedia.');
-        return;
-      }
-      if (!widget.ignoreScheduleForTesting && !exam.isScheduledToday) {
-        setState(() => _message = 'Ujian ini dijadwalkan pada hari ${exam.day}.');
         return;
       }
       if (!mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ExamSessionPage(exam: exam)),
+        MaterialPageRoute(
+          builder: (_) => ExamSelectionPage(
+            exams: exams,
+            ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
+          ),
+        ),
       );
     } on SheetException catch (error) {
       setState(() => _message = error.message);
@@ -234,7 +237,7 @@ class _TokenPageState extends State<TokenPage> {
       children: [
         Text('Masuk ujian', style: theme.textTheme.headlineMedium),
         const SizedBox(height: 8),
-        Text('Masukkan token dari pengawas untuk membuka jadwal dan soal.', style: theme.textTheme.bodyLarge),
+        Text('Masukkan token dari pengawas, lalu pilih mapel dan kelas.', style: theme.textTheme.bodyLarge),
         const SizedBox(height: 36),
         TextField(
           controller: _tokenController,
@@ -255,7 +258,7 @@ class _TokenPageState extends State<TokenPage> {
             icon: _isLoading
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.login),
-            label: Text(_isLoading ? 'Memeriksa token' : 'Buka ujian'),
+            label: Text(_isLoading ? 'Memeriksa token' : 'Lihat pilihan ujian'),
           ),
         ),
         if (_message != null) ...[
@@ -285,7 +288,7 @@ class TestModeNotice extends StatelessWidget {
           children: [
             Text('Versi uji', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
-            const Text('Aplikasi ini membaca jadwal dari Spreadsheet saat token diperiksa. Jangan gunakan sebagai rilis sekolah karena token Sheet publik dapat dilihat oleh orang yang memiliki link.'),
+            const Text('Aplikasi ini membaca jadwal dari Spreadsheet saat token diperiksa. Satu token dapat menampilkan beberapa mapel seperti aplikasi lama. Jangan gunakan sebagai rilis sekolah karena token Sheet publik dapat dilihat oleh orang yang memiliki link.'),
           ],
         ),
       ),
@@ -357,6 +360,64 @@ class SettingsPage extends StatelessWidget {
           subtitle: const Text('Izinkan token dibuka di luar hari yang tercantum pada Spreadsheet.'),
         ),
       ],
+    );
+  }
+}
+
+class ExamSelectionPage extends StatelessWidget {
+  const ExamSelectionPage({
+    super.key,
+    required this.exams,
+    required this.ignoreScheduleForTesting,
+  });
+
+  final List<ExamRecord> exams;
+  final bool ignoreScheduleForTesting;
+
+  void _openExam(BuildContext context, ExamRecord exam) {
+    if (exam.formUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link soal untuk mapel ini belum tersedia.')),
+      );
+      return;
+    }
+    if (!ignoreScheduleForTesting && !exam.isScheduledToday) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ujian ini dijadwalkan pada hari ${exam.day}.')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ExamSessionPage(exam: exam)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pilih ujian')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+        children: [
+          Text('Pilih mapel dan kelas', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 6),
+          Text('Token ini memiliki ${exams.length} pilihan jadwal.'),
+          const SizedBox(height: 16),
+          for (final exam in exams)
+            Card(
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: const Icon(Icons.assignment_outlined),
+                title: Text(exam.subject.isEmpty ? 'Mapel belum diisi' : exam.subject),
+                subtitle: Text(
+                  'Kelas ${exam.classLevel} · Sesi ${exam.session} · ${exam.durationMinutes} menit · ${exam.day}',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _openExam(context, exam),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -522,8 +583,17 @@ const _identityListener = r'''
 ''';
 
 class TokenSheetRepository {
-  Future<List<ExamRecord>> load() async {
-    final response = await http.get(Uri.parse(tokenSheetUrl));
+  Future<List<ExamRecord>> loadByToken(String token) async {
+    final escapedToken = token.replaceAll("'", "''");
+    final uri = Uri.https(
+      'docs.google.com',
+      '/spreadsheets/d/$tokenSheetId/gviz/tq',
+      {
+        'tqx': 'out:csv',
+        'tq': "select * where D = '$escapedToken'",
+      },
+    );
+    final response = await http.get(uri);
     if (response.statusCode != 200) {
       throw const SheetException('Spreadsheet token tidak dapat dibuka.');
     }
@@ -590,12 +660,5 @@ class ExamRecord {
       DateTime.sunday: 'MINGGU',
     };
     return dayNames[DateTime.now().weekday] == day.toUpperCase();
-  }
-}
-
-extension FirstOrNullExtension<T> on Iterable<T> {
-  T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
   }
 }
