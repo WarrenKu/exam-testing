@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
-import 'package:liquid_glass_bar/liquid_glass_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -255,6 +254,118 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
+class FrostedGlassNavBar extends StatelessWidget {
+  const FrostedGlassNavBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+    required this.isDark,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (Icons.home_rounded, 'Beranda'),
+      (Icons.info_outline_rounded, 'Informasi'),
+      (Icons.settings_rounded, 'Pengaturan'),
+    ];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF0F172A).withOpacity(0.40)
+                : Colors.white.withOpacity(0.28),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.12)
+                  : Colors.white.withOpacity(0.45),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: List.generate(items.length, (index) {
+              final isSelected = selectedIndex == index;
+              final (icon, label) = items[index];
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onDestinationSelected(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? (isDark
+                                ? const Color(0xFF1E293B)
+                                : Colors.white)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            icon,
+                            size: 22,
+                            color: isSelected
+                                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              color: isSelected
+                                  ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                  : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ExamShell extends StatefulWidget {
   const ExamShell({
     super.key,
@@ -304,20 +415,11 @@ class _ExamShellState extends State<ExamShell> {
           ? SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-                child: LiquidGlassBar(
-                  items: const [
-                    LiquidGlassBarItem(iconData: Icons.home_rounded, label: 'Beranda'),
-                    LiquidGlassBarItem(iconData: Icons.info_outline_rounded, label: 'Informasi'),
-                    LiquidGlassBarItem(iconData: Icons.settings_rounded, label: 'Pengaturan'),
-                  ],
-                  currentIndex: _selectedIndex,
-                  onTap: (index) => setState(() => _selectedIndex = index),
-                  style: const LiquidGlassBarStyle(
-                    height: 64.0,
-                    borderRadius: 32.0,
-                    activeColor: Color(0xFF10B981),
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: FrostedGlassNavBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (value) => setState(() => _selectedIndex = value),
+                  isDark: widget.isDark,
                 ),
               ),
             )
@@ -651,8 +753,8 @@ class SettingsPage extends StatelessWidget {
         SwitchListTile(
           value: useGlassBar,
           onChanged: onGlassBarChanged,
-          title: const Text('Bilah Navigasi Liquid Glass'),
-          subtitle: const Text('Efek kaca cair mengambang pada menu utama (Eksperimental).'),
+          title: const Text('Bilah Navigasi Glass Transparan'),
+          subtitle: const Text('Efek kaca mengambang semi-transparan dengan blur (Frosted Glass).'),
         ),
       ],
     );
