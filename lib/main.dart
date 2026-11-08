@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:liquid_glass_bar/liquid_glass_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 const tokenSheetCsvUrl =
@@ -77,7 +79,27 @@ class UjianKitaApp extends StatefulWidget {
 class _UjianKitaAppState extends State<UjianKitaApp> {
   bool _isDark = false;
   bool _ignoreScheduleForTesting = true;
+  bool _useLiquidGlass = false;
   bool _isReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _useLiquidGlass = prefs.getBool('use_liquid_glass') ?? false;
+        });
+      }
+    });
+  }
+
+  void _updateLiquidGlass(bool value) {
+    setState(() => _useLiquidGlass = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('use_liquid_glass', value);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,9 +113,11 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
           ? ExamShell(
               isDark: _isDark,
               ignoreScheduleForTesting: _ignoreScheduleForTesting,
+              useLiquidGlass: _useLiquidGlass,
               onThemeChanged: (value) => setState(() => _isDark = value),
               onTestingModeChanged: (value) =>
                   setState(() => _ignoreScheduleForTesting = value),
+              onLiquidGlassChanged: _updateLiquidGlass,
             )
           : SplashScreen(
               onReady: () {
@@ -213,14 +237,18 @@ class ExamShell extends StatefulWidget {
     super.key,
     required this.isDark,
     required this.ignoreScheduleForTesting,
+    required this.useLiquidGlass,
     required this.onThemeChanged,
     required this.onTestingModeChanged,
+    required this.onLiquidGlassChanged,
   });
 
   final bool isDark;
   final bool ignoreScheduleForTesting;
+  final bool useLiquidGlass;
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<bool> onTestingModeChanged;
+  final ValueChanged<bool> onLiquidGlassChanged;
 
   @override
   State<ExamShell> createState() => _ExamShellState();
@@ -237,33 +265,46 @@ class _ExamShellState extends State<ExamShell> {
       SettingsPage(
         isDark: widget.isDark,
         ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
+        useLiquidGlass: widget.useLiquidGlass,
         onThemeChanged: widget.onThemeChanged,
         onTestingModeChanged: widget.onTestingModeChanged,
+        onLiquidGlassChanged: widget.onLiquidGlassChanged,
       ),
     ];
     return Scaffold(
+      extendBody: widget.useLiquidGlass,
       body: SafeArea(child: pages[_selectedIndex]),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: NavigationBar(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (value) => setState(() => _selectedIndex = value),
-                destinations: const [
-                  NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Beranda'),
-                  NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'Informasi'),
-                  NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Pengaturan'),
-                ],
+      bottomNavigationBar: widget.useLiquidGlass
+          ? LiquidGlassBar(
+              items: const [
+                LiquidGlassBarItem(iconData: Icons.home, label: 'Beranda'),
+                LiquidGlassBarItem(iconData: Icons.info_outline, label: 'Informasi'),
+                LiquidGlassBarItem(iconData: Icons.settings, label: 'Pengaturan'),
+              ],
+              currentIndex: _selectedIndex,
+              onTap: (index) => setState(() => _selectedIndex = index),
+            )
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: NavigationBar(
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: (value) => setState(() => _selectedIndex = value),
+                      destinations: const [
+                        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Beranda'),
+                        NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'Informasi'),
+                        NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Pengaturan'),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -538,14 +579,18 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.isDark,
     required this.ignoreScheduleForTesting,
+    required this.useLiquidGlass,
     required this.onThemeChanged,
     required this.onTestingModeChanged,
+    required this.onLiquidGlassChanged,
   });
 
   final bool isDark;
   final bool ignoreScheduleForTesting;
+  final bool useLiquidGlass;
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<bool> onTestingModeChanged;
+  final ValueChanged<bool> onLiquidGlassChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -565,6 +610,12 @@ class SettingsPage extends StatelessWidget {
           onChanged: onTestingModeChanged,
           title: const Text('Mode uji jadwal'),
           subtitle: const Text('Izinkan token dibuka di luar hari yang tercantum pada Spreadsheet.'),
+        ),
+        SwitchListTile(
+          value: useLiquidGlass,
+          onChanged: onLiquidGlassChanged,
+          title: const Text('Bilah Navigasi Liquid Glass'),
+          subtitle: const Text('Efek kaca cair mengambang pada menu utama (Eksperimental).'),
         ),
       ],
     );
