@@ -1,4 +1,4 @@
-name: ujian_kita_test
+name: ujian_kita_sman18
 description: Android test client for token-based Google Form exam sessions.
 publish_to: none
 version: 0.1.0+1
@@ -24,4 +24,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/
     - assets/sman18-batam.png

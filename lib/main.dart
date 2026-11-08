@@ -9,7 +9,8 @@ import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
 
-const tokenSheetId = '1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0';
+const tokenSheetCsvUrl =
+    'https://docs.google.com/spreadsheets/d/1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0/export?format=csv';
 
 void main() {
   runApp(const UjianKitaApp());
@@ -31,7 +32,7 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'UjianKita SMAN18',
+      title: 'EXAMBRO SMAN18 BATAM',
       themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
@@ -83,32 +84,70 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 900), widget.onReady);
+    Future<void>.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted) widget.onReady();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.asset(
-                'assets/sman18-batam.png',
-                width: 116,
-                height: 116,
-                fit: BoxFit.cover,
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/sman18-batam.png',
+                  width: 140,
+                  height: 140,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        Icons.school,
+                        size: 72,
+                        color: theme.colorScheme.primary,
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text('UjianKita SMAN18', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            Text('Menyiapkan sesi ujian', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 28),
-            const SizedBox(width: 28, height: 28, child: CircularProgressIndicator()),
-          ],
+              const SizedBox(height: 24),
+              Text(
+                'EXAMBRO SMAN18 BATAM',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'dev by github/warrenku',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 36),
+              const SizedBox(
+                width: 26,
+                height: 26,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -208,22 +247,42 @@ class _TokenPageState extends State<TokenPage> {
     try {
       final exams = await TokenSheetRepository().loadByToken(enteredToken);
       if (exams.isEmpty) {
-        setState(() => _message = 'Token tidak ditemukan di jadwal ujian.');
+        setState(() => _message = 'Token "$enteredToken" tidak ditemukan di jadwal ujian.');
         return;
       }
       if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ExamSelectionPage(
-            exams: exams,
-            ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
+
+      // Jika hanya ada 1 mapel pada token ini, langsung buka ujian
+      if (exams.length == 1) {
+        final exam = exams.first;
+        if (exam.cleanFormUrl.isEmpty) {
+          setState(() => _message = 'Link soal untuk ${exam.subject.isEmpty ? 'mapel ini' : exam.subject} belum tersedia di Spreadsheet.');
+          return;
+        }
+        if (!widget.ignoreScheduleForTesting && !exam.isScheduledToday) {
+          setState(() => _message = 'Ujian ini dijadwalkan pada hari ${exam.day}. Aktifkan "Mode uji jadwal" di Pengaturan untuk menguji hari ini.');
+          return;
+        }
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExamSessionPage(exam: exam),
           ),
-        ),
-      );
+        );
+      } else {
+        // Jika ada beberapa mapel dengan token yang sama, tampilkan halaman pilihan
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExamSelectionPage(
+              exams: exams,
+              ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
+            ),
+          ),
+        );
+      }
     } on SheetException catch (error) {
       setState(() => _message = error.message);
     } catch (_) {
-      setState(() => _message = 'Token tidak dapat diperiksa. Periksa koneksi internet.');
+      setState(() => _message = 'Gagal memeriksa token. Periksa koneksi internet Anda.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -237,7 +296,7 @@ class _TokenPageState extends State<TokenPage> {
       children: [
         Text('Masuk ujian', style: theme.textTheme.headlineMedium),
         const SizedBox(height: 8),
-        Text('Masukkan token dari pengawas, lalu pilih mapel dan kelas.', style: theme.textTheme.bodyLarge),
+        Text('Masukkan token dari pengawas untuk memulai ujian.', style: theme.textTheme.bodyLarge),
         const SizedBox(height: 36),
         TextField(
           controller: _tokenController,
@@ -245,7 +304,7 @@ class _TokenPageState extends State<TokenPage> {
           textCapitalization: TextCapitalization.characters,
           decoration: const InputDecoration(
             labelText: 'Token ujian',
-            hintText: 'Contoh: token dari pengawas',
+            hintText: 'Contoh: XYZXY',
             prefixIcon: Icon(Icons.key_outlined),
           ),
           onSubmitted: (_) => _isLoading ? null : _validateToken(),
@@ -258,14 +317,14 @@ class _TokenPageState extends State<TokenPage> {
             icon: _isLoading
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.login),
-            label: Text(_isLoading ? 'Memeriksa token' : 'Lihat pilihan ujian'),
+            label: Text(_isLoading ? 'Memeriksa token...' : 'Buka ujian'),
           ),
         ),
         if (_message != null) ...[
           const SizedBox(height: 18),
           Semantics(
             liveRegion: true,
-            child: Text(_message!, style: TextStyle(color: theme.colorScheme.error)),
+            child: Text(_message!, style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.w500)),
           ),
         ],
         const SizedBox(height: 44),
@@ -288,7 +347,11 @@ class TestModeNotice extends StatelessWidget {
           children: [
             Text('Versi uji', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
-            const Text('Aplikasi ini membaca jadwal dari Spreadsheet saat token diperiksa. Satu token dapat menampilkan beberapa mapel seperti aplikasi lama. Jangan gunakan sebagai rilis sekolah karena token Sheet publik dapat dilihat oleh orang yang memiliki link.'),
+            const Text(
+              'Aplikasi membaca jadwal langsung dari Spreadsheet saat token diperiksa. '
+              'Jika token berisi satu mapel, aplikasi langsung membuka soal Google Form. '
+              'Jika token digunakan bersama oleh beberapa kelas, akan muncul daftar pilihan mapel.',
+            ),
           ],
         ),
       ),
@@ -319,7 +382,7 @@ class InformationPage extends StatelessWidget {
         const ListTile(
           leading: Icon(Icons.privacy_tip_outlined),
           title: Text('Data peserta'),
-          subtitle: Text('Nama dan kelas dibaca saat diketik pada halaman awal Google Form dalam aplikasi.'),
+          subtitle: Text('Nama dan kelas dibaca otomatis saat diketik pada formulir Google Form.'),
         ),
       ],
     );
@@ -375,15 +438,20 @@ class ExamSelectionPage extends StatelessWidget {
   final bool ignoreScheduleForTesting;
 
   void _openExam(BuildContext context, ExamRecord exam) {
-    if (exam.formUrl.isEmpty) {
+    if (exam.cleanFormUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link soal untuk mapel ini belum tersedia.')),
+        SnackBar(
+          content: Text('Link soal untuk ${exam.subject.isEmpty ? 'mapel ini' : exam.subject} belum tersedia.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
       return;
     }
     if (!ignoreScheduleForTesting && !exam.isScheduledToday) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ujian ini dijadwalkan pada hari ${exam.day}.')),
+        SnackBar(
+          content: Text('Ujian ini dijadwalkan pada hari ${exam.day}. Aktifkan Mode uji jadwal di Pengaturan.'),
+        ),
       );
       return;
     }
@@ -435,24 +503,54 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   late final WebViewController _webController;
   String _name = 'Belum terbaca';
   String _className = 'Belum terbaca';
-  String _deviceLabel = 'Memeriksa perangkat';
+  String _deviceLabel = 'Memeriksa perangkat...';
   int _leaveCount = 0;
   bool _locked = false;
+  bool _isLoadingWeb = true;
+  String? _webError;
 
   @override
   void initState() {
     super.initState();
     unawaited(_setScreenSecurity(true));
     WidgetsBinding.instance.addObserver(this);
+
     _webController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36')
       ..addJavaScriptChannel('UjianKita', onMessageReceived: _readIdentity)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (_) => _webController.runJavaScript(_identityListener),
+          onPageStarted: (_) {
+            if (mounted) {
+              setState(() {
+                _isLoadingWeb = true;
+                _webError = null;
+              });
+            }
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _isLoadingWeb = false);
+            _webController.runJavaScript(_identityListener);
+          },
+          onWebResourceError: (error) {
+            if (mounted) {
+              setState(() {
+                _isLoadingWeb = false;
+                _webError = 'Gagal memuat halaman ujian (${error.description}).';
+              });
+            }
+          },
         ),
-      )
-      ..loadRequest(Uri.parse(widget.exam.formUrl));
+      );
+
+    final targetUrl = widget.exam.cleanFormUrl;
+    if (targetUrl.isNotEmpty) {
+      _webController.loadRequest(Uri.parse(targetUrl));
+    } else {
+      _webError = 'Tautan formulir soal tidak valid atau kosong.';
+    }
+
     _readDeviceLabel();
   }
 
@@ -479,8 +577,14 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   }
 
   Future<void> _readDeviceLabel() async {
-    final info = await DeviceInfoPlugin().androidInfo;
-    if (mounted) setState(() => _deviceLabel = '${info.manufacturer} ${info.model}');
+    try {
+      final info = await DeviceInfoPlugin().androidInfo;
+      if (mounted) {
+        setState(() => _deviceLabel = '${info.manufacturer} ${info.model}');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _deviceLabel = 'Android Device');
+    }
   }
 
   void _readIdentity(JavaScriptMessage message) {
@@ -499,34 +603,120 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     Navigator.of(context).pop();
   }
 
+  Future<void> _confirmExit() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar dari Ujian?'),
+        content: const Text('Pastikan kamu sudah menekan tombol "Kirim" / "Submit" pada Google Form sebelum keluar.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Ya, Selesai'),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final subjectTitle = widget.exam.subject.isEmpty ? 'Ujian' : widget.exam.subject;
+
     return PopScope(
       canPop: false,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.exam.subject),
+          title: Text(subjectTitle),
           automaticallyImplyLeading: false,
           actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(child: Text('Keluar: $_leaveCount/3')),
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _leaveCount > 0 ? theme.colorScheme.errorContainer : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  'Keluar: $_leaveCount/3',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _leaveCount > 0 ? theme.colorScheme.onErrorContainer : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.exit_to_app),
+              tooltip: 'Selesai ujian',
+              onPressed: _confirmExit,
             ),
           ],
         ),
         body: Stack(
           children: [
-            WebViewWidget(controller: _webController),
-            Align(
-              alignment: Alignment.topCenter,
-              child: Material(
-                color: theme.colorScheme.secondaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text('Sesi: $_name · $_className · $_deviceLabel', maxLines: 1, overflow: TextOverflow.ellipsis),
+            Column(
+              children: [
+                Material(
+                  color: theme.colorScheme.secondaryContainer,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      'Sesi: $_name · $_className · $_deviceLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 3),
+                if (_webError != null)
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                            const SizedBox(height: 12),
+                            Text(_webError!, textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isLoadingWeb = true;
+                                  _webError = null;
+                                });
+                                _webController.reload();
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Coba Lagi'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: WebViewWidget(controller: _webController),
+                  ),
+              ],
             ),
             if (_locked)
               Positioned.fill(
@@ -542,9 +732,15 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           const SizedBox(height: 16),
                           Text('Sesi dikunci', style: theme.textTheme.headlineSmall),
                           const SizedBox(height: 8),
-                          const Text('Aplikasi telah ditinggalkan tiga kali. Masukkan token lagi untuk memulai sesi uji baru.', textAlign: TextAlign.center),
+                          const Text(
+                            'Aplikasi telah ditinggalkan tiga kali. Masukkan token lagi untuk memulai sesi uji baru.',
+                            textAlign: TextAlign.center,
+                          ),
                           const SizedBox(height: 20),
-                          FilledButton(onPressed: _restartWithToken, child: const Text('Kembali ke token')),
+                          FilledButton(
+                            onPressed: _restartWithToken,
+                            child: const Text('Kembali ke token'),
+                          ),
                         ],
                       ),
                     ),
@@ -584,28 +780,74 @@ const _identityListener = r'''
 
 class TokenSheetRepository {
   Future<List<ExamRecord>> loadByToken(String token) async {
-    final escapedToken = token.replaceAll("'", "''");
-    final uri = Uri.https(
-      'docs.google.com',
-      '/spreadsheets/d/$tokenSheetId/gviz/tq',
-      {
-        'tqx': 'out:csv',
-        'tq': "select * where D = '$escapedToken'",
-      },
-    );
-    final response = await http.get(uri);
+    final cleanInputToken = token.trim();
+    if (cleanInputToken.isEmpty) return [];
+
+    final response = await http.get(Uri.parse(tokenSheetCsvUrl));
     if (response.statusCode != 200) {
-      throw const SheetException('Spreadsheet token tidak dapat dibuka.');
+      throw SheetException('Gagal menghubungi Spreadsheet (HTTP ${response.statusCode}). Pastikan koneksi internet aktif.');
     }
+
     final rows = const CsvToListConverter(shouldParseNumbers: false).convert(response.body);
-    if (rows.length < 2) throw const SheetException('Spreadsheet token belum memiliki jadwal.');
-    final header = rows.first.map((cell) => cell.toString().trim().toUpperCase()).toList();
-    final required = ['MAPEL', 'KELAS', 'SESI', 'TOKEN', 'DURASI', 'HARI', 'LINK SOAL'];
-    if (required.any((name) => !header.contains(name))) {
-      throw const SheetException('Kolom Spreadsheet tidak sesuai format token.');
+    if (rows.length < 2) {
+      throw const SheetException('Spreadsheet token kosong atau belum memiliki jadwal.');
     }
-    final index = {for (var position = 0; position < header.length; position++) header[position]: position};
-    return rows.skip(1).map((row) => ExamRecord.fromRow(row, index)).where((record) => record.token.isNotEmpty).toList();
+
+    final rawHeader = rows.first.map((cell) => cell.toString().trim().toUpperCase()).toList();
+
+    int? findColumn(List<String> keywords) {
+      for (final kw in keywords) {
+        final idx = rawHeader.indexOf(kw);
+        if (idx != -1) return idx;
+      }
+      for (final kw in keywords) {
+        final idx = rawHeader.indexWhere((h) => h.contains(kw));
+        if (idx != -1) return idx;
+      }
+      return null;
+    }
+
+    final mapelIdx = findColumn(['MAPEL', 'MATA PELAJARAN']);
+    final kelasIdx = findColumn(['KELAS', 'TINGKAT']);
+    final sesiIdx = findColumn(['SESI']);
+    final tokenIdx = findColumn(['TOKEN', 'KODE']);
+    final durasiIdx = findColumn(['DURASI', 'DURAS', 'WAKTU']);
+    final hariIdx = findColumn(['HARI', 'JADWAL']);
+    final linkIdx = findColumn(['LINK SOAL', 'LINK FORM', 'LINK', 'URL', 'SOAL', 'FORM']);
+
+    if (tokenIdx == null || linkIdx == null) {
+      throw const SheetException('Kolom TOKEN atau LINK SOAL tidak ditemukan di Spreadsheet.');
+    }
+
+    String getCell(List<dynamic> row, int? idx) {
+      if (idx == null || idx >= row.length) return '';
+      return row[idx].toString().trim();
+    }
+
+    final results = <ExamRecord>[];
+    for (var i = 1; i < rows.length; i++) {
+      final row = rows[i];
+      if (row.isEmpty) continue;
+
+      final rowToken = getCell(row, tokenIdx);
+      if (rowToken.isEmpty) continue;
+
+      if (rowToken.toUpperCase() == cleanInputToken.toUpperCase()) {
+        results.add(
+          ExamRecord(
+            subject: getCell(row, mapelIdx),
+            classLevel: getCell(row, kelasIdx),
+            session: getCell(row, sesiIdx),
+            token: rowToken,
+            durationMinutes: getCell(row, durasiIdx),
+            day: getCell(row, hariIdx),
+            formUrl: getCell(row, linkIdx),
+          ),
+        );
+      }
+    }
+
+    return results;
   }
 }
 
@@ -633,20 +875,13 @@ class ExamRecord {
   final String day;
   final String formUrl;
 
-  factory ExamRecord.fromRow(List<dynamic> row, Map<String, int> index) {
-    String value(String name) {
-      final position = index[name]!;
-      return position < row.length ? row[position].toString().trim() : '';
+  String get cleanFormUrl {
+    final trimmed = formUrl.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
     }
-    return ExamRecord(
-      subject: value('MAPEL'),
-      classLevel: value('KELAS'),
-      session: value('SESI'),
-      token: value('TOKEN'),
-      durationMinutes: value('DURASI'),
-      day: value('HARI'),
-      formUrl: value('LINK SOAL'),
-    );
+    return 'https://$trimmed';
   }
 
   bool get isScheduledToday {
@@ -659,6 +894,9 @@ class ExamRecord {
       DateTime.saturday: 'SABTU',
       DateTime.sunday: 'MINGGU',
     };
-    return dayNames[DateTime.now().weekday] == day.toUpperCase();
+    final todayName = dayNames[DateTime.now().weekday] ?? '';
+    final normalizedExamDay = day.toUpperCase().replaceAll("'", '').replaceAll('`', '');
+    final normalizedToday = todayName.replaceAll("'", '').replaceAll('`', '');
+    return normalizedExamDay == normalizedToday;
   }
 }
