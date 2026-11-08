@@ -135,6 +135,12 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
 
   void _updateDevModeUnlocked(bool value) {
     setState(() => _devModeUnlocked = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('dev_mode_unlocked', value);
+      if (!value) {
+        prefs.remove('dev_otp_date');
+      }
+    });
   }
 
   void _updateDevAntiScreenshot(bool value) {
@@ -323,6 +329,9 @@ class DeveloperGuideLinesOverlay extends StatefulWidget {
 
   final Widget child;
 
+  /// Posisi koordinat penunjuk disimpan statis agar tidak reset/refresh ke atas saat ditoggle atau berpindah halaman
+  static Offset sharedPointer = const Offset(200, 300);
+
   @override
   State<DeveloperGuideLinesOverlay> createState() =>
       _DeveloperGuideLinesOverlayState();
@@ -330,56 +339,36 @@ class DeveloperGuideLinesOverlay extends StatefulWidget {
 
 class _DeveloperGuideLinesOverlayState
     extends State<DeveloperGuideLinesOverlay> {
-  Offset _pointer = const Offset(180, 260);
-
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        widget.child,
-        Positioned.fill(
-          child: IgnorePointer(
-            ignoring: true, // Tidak menghalangi tombol atau input di bawahnya
-            child: CustomPaint(
-              painter: _GuideLinesPainter(pointer: _pointer),
-            ),
-          ),
-        ),
-        // Handle lingkaran merah yang bisa digeser untuk mengatur posisi crosshair
-        Positioned(
-          left: (_pointer.dx - 18)
-              .clamp(8.0, MediaQuery.of(context).size.width - 44),
-          top: (_pointer.dy - 18)
-              .clamp(8.0, MediaQuery.of(context).size.height - 44),
-          child: GestureDetector(
-            onPanUpdate: (details) {
-              setState(() {
-                _pointer += details.delta;
-              });
-            },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.85),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.drag_indicator_rounded,
-                color: Colors.white,
-                size: 18,
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        setState(() {
+          DeveloperGuideLinesOverlay.sharedPointer = event.position;
+        });
+      },
+      onPointerMove: (event) {
+        setState(() {
+          DeveloperGuideLinesOverlay.sharedPointer = event.position;
+        });
+      },
+      // Saat jari tidak digerakkan atau diangkat, garis penunjuk tetap diam di posisi terakhir
+      child: Stack(
+        children: [
+          widget.child,
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: true, // Garis penunjuk tidak menghalangi tombol, scroll, atau ketukan
+              child: CustomPaint(
+                painter: _GuideLinesPainter(
+                  pointer: DeveloperGuideLinesOverlay.sharedPointer,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -497,6 +486,7 @@ class _ExamShellState extends State<ExamShell> {
         onTestingModeChanged: widget.onTestingModeChanged,
         onGlassBarChanged: widget.onGlassBarChanged,
         devModeUnlocked: widget.devModeUnlocked,
+        onDevModeUnlockedChanged: widget.onDevModeUnlockedChanged,
         devAntiScreenshot: widget.devAntiScreenshot,
         devKioskPinning: widget.devKioskPinning,
         devNoDetectViolations: widget.devNoDetectViolations,
@@ -1058,6 +1048,29 @@ class DeveloperModeSectionState extends State<DeveloperModeSection> {
     });
   }
 
+  Future<void> _deactivateDevMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('dev_mode_unlocked', false);
+    await prefs.remove('dev_otp_date');
+
+    widget.onDevModeUnlockedChanged?.call(false);
+
+    setState(() {
+      _isDevUnlocked = false;
+      _showOtpInput = false;
+      _currentOtp = null;
+      _otpError = null;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mode Pengembang telah dinonaktifkan.'),
+        ),
+      );
+    }
+  }
+
   Widget _buildOtpBox(
     TextEditingController controller,
     FocusNode currentFocus,
@@ -1118,11 +1131,14 @@ class DeveloperModeSectionState extends State<DeveloperModeSection> {
             children: [
               Icon(Icons.terminal_rounded, size: 20, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
-              const Text(
-                'Mode Pengembang (Developer)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              const Expanded(
+                child: Text(
+                  'Mode Pengembang (Developer)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               if (_isDevUnlocked)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1226,23 +1242,30 @@ class DeveloperModeSectionState extends State<DeveloperModeSection> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Terhubung dengan Telegram',
-                        style: TextStyle(
-                          color: Color(0xFF16A34A),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                      const Expanded(
+                        child: Text(
+                          'Terhubung dengan Telegram',
+                          style: TextStyle(
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       InkWell(
                         onTap: _disconnect,
-                        child: const Text(
-                          'Putuskan',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 11,
-                            decoration: TextDecoration.underline,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            'Putuskan',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ),
@@ -1355,14 +1378,34 @@ class DeveloperModeSectionState extends State<DeveloperModeSection> {
                   color: theme.colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Akses Pengembang Aktif. Perangkat ini telah terverifikasi oleh akun Telegram Developer.',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    const Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Akses Pengembang Aktif. Perangkat ini telah terverifikasi oleh akun Telegram Developer.',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _deactivateDevMode,
+                        icon: const Icon(Icons.lock_rounded, size: 16, color: Colors.redAccent),
+                        label: const Text(
+                          'Nonaktifkan Mode Pengembang',
+                          style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.redAccent),
+                        ),
                       ),
                     ),
                   ],
@@ -1564,6 +1607,7 @@ class SettingsPage extends StatelessWidget {
     required this.onTestingModeChanged,
     required this.onGlassBarChanged,
     this.devModeUnlocked = false,
+    this.onDevModeUnlockedChanged,
     this.devAntiScreenshot = true,
     this.devKioskPinning = true,
     this.devNoDetectViolations = false,
@@ -1582,6 +1626,7 @@ class SettingsPage extends StatelessWidget {
   final ValueChanged<bool> onGlassBarChanged;
 
   final bool devModeUnlocked;
+  final ValueChanged<bool>? onDevModeUnlockedChanged;
   final bool devAntiScreenshot;
   final bool devKioskPinning;
   final bool devNoDetectViolations;
@@ -1625,16 +1670,27 @@ class SettingsPage extends StatelessWidget {
             children: [
               const Icon(Icons.developer_mode_rounded, color: Colors.blueAccent, size: 20),
               const SizedBox(width: 8),
-              Text(
-                'Opsi Pengembang (Developer)',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueAccent,
-                    ),
+              Expanded(
+                child: Text(
+                  'Opsi Pengembang (Developer)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
+          SwitchListTile(
+            value: devModeUnlocked,
+            onChanged: onDevModeUnlockedChanged,
+            title: const Text('Mode Pengembang Aktif'),
+            subtitle: const Text(
+              'Matikan untuk menonaktifkan dan menyembunyikan semua opsi pengembang.',
+            ),
+          ),
           SwitchListTile(
             value: devAntiScreenshot,
             onChanged: onDevAntiScreenshotChanged,
