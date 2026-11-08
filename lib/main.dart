@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
-import 'package:liquid_glass_bar/liquid_glass_bar.dart';
+import 'package:glass_bottom_navigation/glass_bottom_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -16,6 +16,15 @@ const tokenSheetCsvUrl =
     'https://docs.google.com/spreadsheets/d/1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0/export?format=csv';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+    ),
+  );
   runApp(const UjianKitaApp());
 }
 
@@ -79,7 +88,7 @@ class UjianKitaApp extends StatefulWidget {
 class _UjianKitaAppState extends State<UjianKitaApp> {
   bool _isDark = false;
   bool _ignoreScheduleForTesting = true;
-  bool _useLiquidGlass = false;
+  bool _useGlassBar = false;
   bool _isReady = false;
 
   @override
@@ -88,15 +97,18 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
     SharedPreferences.getInstance().then((prefs) {
       if (mounted) {
         setState(() {
-          _useLiquidGlass = prefs.getBool('use_liquid_glass') ?? false;
+          _useGlassBar = prefs.getBool('use_glass_bar') ??
+              prefs.getBool('use_liquid_glass') ??
+              false;
         });
       }
     });
   }
 
-  void _updateLiquidGlass(bool value) {
-    setState(() => _useLiquidGlass = value);
+  void _updateGlassBar(bool value) {
+    setState(() => _useGlassBar = value);
     SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('use_glass_bar', value);
       prefs.setBool('use_liquid_glass', value);
     });
   }
@@ -113,11 +125,11 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
           ? ExamShell(
               isDark: _isDark,
               ignoreScheduleForTesting: _ignoreScheduleForTesting,
-              useLiquidGlass: _useLiquidGlass,
+              useGlassBar: _useGlassBar,
               onThemeChanged: (value) => setState(() => _isDark = value),
               onTestingModeChanged: (value) =>
                   setState(() => _ignoreScheduleForTesting = value),
-              onLiquidGlassChanged: _updateLiquidGlass,
+              onGlassBarChanged: _updateGlassBar,
             )
           : SplashScreen(
               onReady: () {
@@ -135,6 +147,17 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
     return ThemeData(
       colorScheme: colorScheme,
       useMaterial3: true,
+      appBarTheme: AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness:
+              brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness:
+              brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
@@ -237,18 +260,18 @@ class ExamShell extends StatefulWidget {
     super.key,
     required this.isDark,
     required this.ignoreScheduleForTesting,
-    required this.useLiquidGlass,
+    required this.useGlassBar,
     required this.onThemeChanged,
     required this.onTestingModeChanged,
-    required this.onLiquidGlassChanged,
+    required this.onGlassBarChanged,
   });
 
   final bool isDark;
   final bool ignoreScheduleForTesting;
-  final bool useLiquidGlass;
+  final bool useGlassBar;
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<bool> onTestingModeChanged;
-  final ValueChanged<bool> onLiquidGlassChanged;
+  final ValueChanged<bool> onGlassBarChanged;
 
   @override
   State<ExamShell> createState() => _ExamShellState();
@@ -265,24 +288,51 @@ class _ExamShellState extends State<ExamShell> {
       SettingsPage(
         isDark: widget.isDark,
         ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
-        useLiquidGlass: widget.useLiquidGlass,
+        useGlassBar: widget.useGlassBar,
         onThemeChanged: widget.onThemeChanged,
         onTestingModeChanged: widget.onTestingModeChanged,
-        onLiquidGlassChanged: widget.onLiquidGlassChanged,
+        onGlassBarChanged: widget.onGlassBarChanged,
       ),
     ];
     return Scaffold(
-      extendBody: widget.useLiquidGlass,
-      body: SafeArea(child: pages[_selectedIndex]),
-      bottomNavigationBar: widget.useLiquidGlass
-          ? LiquidGlassBar(
-              items: const [
-                LiquidGlassBarItem(iconData: Icons.home, label: 'Beranda'),
-                LiquidGlassBarItem(iconData: Icons.info_outline, label: 'Informasi'),
-                LiquidGlassBarItem(iconData: Icons.settings, label: 'Pengaturan'),
-              ],
-              currentIndex: _selectedIndex,
-              onTap: (index) => setState(() => _selectedIndex = index),
+      extendBody: widget.useGlassBar,
+      body: SafeArea(
+        bottom: !widget.useGlassBar,
+        child: pages[_selectedIndex],
+      ),
+      bottomNavigationBar: widget.useGlassBar
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: GlassBottomBar(
+                    items: const [
+                      GlassBarItem(
+                        icon: Icons.home_rounded,
+                        label: 'Beranda',
+                        nativeSymbolName: 'house.fill',
+                      ),
+                      GlassBarItem(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Informasi',
+                        nativeSymbolName: 'info.circle',
+                      ),
+                      GlassBarItem(
+                        icon: Icons.settings_rounded,
+                        label: 'Pengaturan',
+                        nativeSymbolName: 'gearshape',
+                      ),
+                    ],
+                    currentIndex: _selectedIndex,
+                    onTap: (index) => setState(() => _selectedIndex = index),
+                    style: GlassBottomNavStyle(
+                      accent: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
             )
           : SafeArea(
               top: false,
@@ -387,7 +437,7 @@ class _TokenPageState extends State<TokenPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
       children: [
         Text('Masuk ujian', style: theme.textTheme.headlineMedium),
         const SizedBox(height: 8),
@@ -482,7 +532,7 @@ class InformationPage extends StatelessWidget {
     final theme = Theme.of(context);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
       children: [
         Text(
           'Informasi ujian',
@@ -579,23 +629,23 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.isDark,
     required this.ignoreScheduleForTesting,
-    required this.useLiquidGlass,
+    required this.useGlassBar,
     required this.onThemeChanged,
     required this.onTestingModeChanged,
-    required this.onLiquidGlassChanged,
+    required this.onGlassBarChanged,
   });
 
   final bool isDark;
   final bool ignoreScheduleForTesting;
-  final bool useLiquidGlass;
+  final bool useGlassBar;
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<bool> onTestingModeChanged;
-  final ValueChanged<bool> onLiquidGlassChanged;
+  final ValueChanged<bool> onGlassBarChanged;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
       children: [
         Text('Pengaturan', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 20),
@@ -612,10 +662,10 @@ class SettingsPage extends StatelessWidget {
           subtitle: const Text('Izinkan token dibuka di luar hari yang tercantum pada Spreadsheet.'),
         ),
         SwitchListTile(
-          value: useLiquidGlass,
-          onChanged: onLiquidGlassChanged,
-          title: const Text('Bilah Navigasi Liquid Glass'),
-          subtitle: const Text('Efek kaca cair mengambang pada menu utama (Eksperimental).'),
+          value: useGlassBar,
+          onChanged: onGlassBarChanged,
+          title: const Text('Bilah Navigasi Glass'),
+          subtitle: const Text('Efek kaca mengambang pada menu utama (Eksperimental).'),
         ),
       ],
     );

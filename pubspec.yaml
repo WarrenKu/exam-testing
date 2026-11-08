@@ -12,8 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_windowmanager_plus: ^1.1.1
+  glass_bottom_navigation: ^0.2.0
   http: ^1.2.2
-  liquid_glass_bar: ^0.1.1
   shared_preferences: ^2.3.3
   webview_flutter: ^4.10.0
 
