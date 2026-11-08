@@ -551,18 +551,6 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   bool _isLoadingWeb = true;
   String? _webError;
 
-  bool _canGoBack = false;
-  bool _canGoForward = false;
-
-  // Realtime Device & Exam Statistics
-  late DateTime _sessionStartTime;
-  Timer? _tickerTimer;
-  int _batteryLevel = 100;
-  bool _isCharging = false;
-  double _deviceTemp = 33.5;
-  String _networkName = 'Wi-Fi';
-  bool _isPinned = false;
-
   @override
   void initState() {
     super.initState();
@@ -572,24 +560,6 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     // Kiosk Mode & Layar Penuh Immersive Sticky
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     unawaited(KioskService.startLockTask());
-
-    _sessionStartTime = DateTime.now();
-
-    // Timer realtime 1 detik untuk statistik durasi, waktu, dan polling device
-    _tickerTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-
-    // Polling stats setiap 5 detik
-    Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      _fetchDeviceStats();
-    });
 
     _webController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -606,10 +576,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
             }
           },
           onPageFinished: (_) {
-            if (mounted) {
-              setState(() => _isLoadingWeb = false);
-              _updateNavState();
-            }
+            if (mounted) setState(() => _isLoadingWeb = false);
             _webController.runJavaScript(_identityListener);
           },
           onWebResourceError: (error) {
@@ -631,43 +598,15 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     }
 
     _readDeviceLabel();
-    _fetchDeviceStats();
   }
 
   @override
   void dispose() {
-    _tickerTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_setScreenSecurity(false));
     unawaited(KioskService.stopLockTask());
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
-  }
-
-  Future<void> _updateNavState() async {
-    final back = await _webController.canGoBack();
-    final fwd = await _webController.canGoForward();
-    if (mounted) {
-      setState(() {
-        _canGoBack = back;
-        _canGoForward = fwd;
-      });
-    }
-  }
-
-  Future<void> _fetchDeviceStats() async {
-    final stats = await KioskService.getStats();
-    if (!mounted) return;
-    if (stats.isNotEmpty) {
-      setState(() {
-        _batteryLevel = stats['batteryLevel'] as int? ?? _batteryLevel;
-        _isCharging = stats['isCharging'] as bool? ?? _isCharging;
-        final temp = stats['temperature'];
-        if (temp is num && temp > 0) _deviceTemp = temp.toDouble();
-        _networkName = stats['network'] as String? ?? _networkName;
-        _isPinned = stats['isPinned'] as bool? ?? _isPinned;
-      });
-    }
   }
 
   Future<void> _setScreenSecurity(bool secure) async {
@@ -713,33 +652,19 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   }
 
   Future<void> _confirmExit() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF18181C) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.1)),
-        ),
-        title: Text(
-          'Selesaikan Ujian?',
-          style: TextStyle(
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
+        title: const Text('Keluar dari Ujian?'),
+        content: const Text(
           'Pastikan kamu sudah menekan tombol "Kirim" / "Submit" pada Google Form sebelum keluar.',
-          style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Batal', style: TextStyle(color: isDark ? Colors.white60 : Colors.black54)),
+            child: const Text('Batal'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Ya, Selesai'),
           ),
@@ -752,708 +677,133 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     }
   }
 
-  String _formatDuration(Duration d) {
-    final hours = d.inHours.toString().padLeft(2, '0');
-    final minutes = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return hours == '00' ? '$minutes:$seconds' : '$hours:$minutes:$seconds';
-  }
-
-  String _formatCurrentTime() {
-    final now = DateTime.now();
-    final h = now.hour.toString().padLeft(2, '0');
-    final m = now.minute.toString().padLeft(2, '0');
-    final s = now.second.toString().padLeft(2, '0');
-    return '$h:$m:$s WIB';
-  }
-
-  void _showStatsDialog() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeDuration = DateTime.now().difference(_sessionStartTime);
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xE6141418) : Colors.white.withOpacity(0.96),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.1),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.5 : 0.12),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1D4ED8).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
-                        ),
-                        child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Informasi',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'EXAMBRO SMAN18 BATAM',
-                              style: TextStyle(
-                                color: isDark ? Colors.white54 : Colors.black54,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.close, color: isDark ? Colors.white70 : Colors.black54),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Divider(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08), height: 1),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.timer_outlined,
-                          title: 'Durasi Aktif',
-                          value: _formatDuration(activeDuration),
-                          accentColor: const Color(0xFF0284C7),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.access_time,
-                          title: 'Waktu Saat Ini',
-                          value: _formatCurrentTime(),
-                          accentColor: const Color(0xFF7C3AED),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.device_thermostat_outlined,
-                          title: 'Suhu HP',
-                          value: '${_deviceTemp > 0 ? _deviceTemp.toStringAsFixed(1) : '33.5'} °C',
-                          accentColor: const Color(0xFFD97706),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.wifi,
-                          title: 'Jaringan',
-                          value: _networkName,
-                          accentColor: const Color(0xFF059669),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: _isCharging ? Icons.battery_charging_full : Icons.battery_std,
-                          title: 'Baterai',
-                          value: '${_batteryLevel >= 0 ? _batteryLevel : 100}% ${_isCharging ? '⚡' : ''}',
-                          accentColor: const Color(0xFF16A34A),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.warning_amber_rounded,
-                          title: 'Total Pelanggaran',
-                          value: '$_leaveCount / 3',
-                          accentColor: _leaveCount > 0 ? const Color(0xFFEF4444) : (isDark ? const Color(0xFF9CA3AF) : Colors.black45),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.06),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Peserta: $_name · $_className',
-                          style: TextStyle(
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Mapel: ${widget.exam.subject}',
-                          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Perangkat: $_deviceLabel',
-                          style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF1D4ED8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final subjectTitle = widget.exam.subject.isEmpty ? 'Ujian' : widget.exam.subject;
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  // ==========================================
-                  // GLISSE TOP BAR (Diletakkan di ATAS layer ujian)
-                  // Tampilan default putih / terang, tidak menutupi form bawah
-                  // ==========================================
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                    child: GlisseTopBar(
-                      subject: subjectTitle,
-                      canGoBack: _canGoBack,
-                      canGoForward: _canGoForward,
-                      leaveCount: _leaveCount,
-                      onBack: () async {
-                        if (await _webController.canGoBack()) {
-                          await _webController.goBack();
-                          _updateNavState();
-                        }
-                      },
-                      onForward: () async {
-                        if (await _webController.canGoForward()) {
-                          await _webController.goForward();
-                          _updateNavState();
-                        }
-                      },
-                      onReload: () => _webController.reload(),
-                      onExit: _confirmExit,
-                      onInfo: _showStatsDialog,
+        appBar: AppBar(
+          title: Text(subjectTitle),
+          automaticallyImplyLeading: false,
+          actions: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _leaveCount > 0
+                    ? theme.colorScheme.errorContainer
+                    : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  'Keluar: $_leaveCount/3',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _leaveCount > 0
+                        ? theme.colorScheme.onErrorContainer
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.exit_to_app),
+              tooltip: 'Selesai ujian',
+              onPressed: _confirmExit,
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                Material(
+                  color: theme.colorScheme.secondaryContainer,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      'Sesi: $_name · $_className · $_deviceLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-
-                  if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 2.5),
-
-                  // LAYER GOOGLE FORM (100% Bersih dari tombol di bawah)
-                  if (_webError != null)
-                    Expanded(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-                              const SizedBox(height: 12),
-                              Text(_webError!, textAlign: TextAlign.center),
-                              const SizedBox(height: 16),
-                              FilledButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _isLoadingWeb = true;
-                                    _webError = null;
-                                  });
-                                  _webController.reload();
-                                },
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Coba Lagi'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: WebViewWidget(controller: _webController),
-                    ),
-                ],
-              ),
-
-              // Lock Overlay if 3 violations reached
-              if (_locked)
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: Colors.black.withOpacity(0.96),
+                ),
+                if (_isLoadingWeb) const LinearProgressIndicator(minHeight: 3),
+                if (_webError != null)
+                  Expanded(
                     child: Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(28),
+                        padding: const EdgeInsets.all(24),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.lock_outline, size: 56, color: Color(0xFFEF4444)),
+                            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                            const SizedBox(height: 12),
+                            Text(_webError!, textAlign: TextAlign.center),
                             const SizedBox(height: 16),
-                            const Text(
-                              'Sesi dikunci',
-                              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Aplikasi telah ditinggalkan tiga kali. Masukkan token lagi untuk memulai sesi uji baru.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                            const SizedBox(height: 20),
-                            FilledButton(
-                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                              onPressed: _restartWithToken,
-                              child: const Text('Kembali ke token'),
+                            FilledButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isLoadingWeb = true;
+                                  _webError = null;
+                                });
+                                _webController.reload();
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Coba Lagi'),
                             ),
                           ],
                         ),
                       ),
                     ),
+                  )
+                else
+                  Expanded(
+                    child: WebViewWidget(controller: _webController),
                   ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bilah Navigasi Atas Bergaya Glisse Liquid Glass Asli
-/// Mendukung tema putih (default) dan tema gelap
-class GlisseTopBar extends StatelessWidget {
-  const GlisseTopBar({
-    super.key,
-    required this.subject,
-    required this.canGoBack,
-    required this.canGoForward,
-    required this.leaveCount,
-    required this.onBack,
-    required this.onForward,
-    required this.onReload,
-    required this.onExit,
-    required this.onInfo,
-  });
-
-  final String subject;
-  final bool canGoBack;
-  final bool canGoForward;
-  final int leaveCount;
-  final VoidCallback onBack;
-  final VoidCallback onForward;
-  final VoidCallback onReload;
-  final VoidCallback onExit;
-  final VoidCallback onInfo;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xEB16161A) : Colors.white.withOpacity(0.92),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.1),
-              width: 1.2,
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
-                blurRadius: 18,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Navigation Capsule (< > ↻)
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _GlisseIconButton(
-                      icon: Icons.chevron_left_rounded,
-                      isEnabled: canGoBack,
-                      tooltip: 'Kembali',
-                      isDark: isDark,
-                      onTap: canGoBack ? onBack : null,
-                    ),
-                    Container(width: 1, height: 16, color: isDark ? Colors.white12 : Colors.black12),
-                    _GlisseIconButton(
-                      icon: Icons.chevron_right_rounded,
-                      isEnabled: canGoForward,
-                      tooltip: 'Maju',
-                      isDark: isDark,
-                      onTap: canGoForward ? onForward : null,
-                    ),
-                    Container(width: 1, height: 16, color: isDark ? Colors.white12 : Colors.black12),
-                    _GlisseIconButton(
-                      icon: Icons.refresh_rounded,
-                      isEnabled: true,
-                      tooltip: 'Muat ulang',
-                      isDark: isDark,
-                      onTap: onReload,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Title Subject
-              Expanded(
-                child: Text(
-                  subject,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Violation Badge (Score)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: leaveCount > 0
-                      ? const Color(0xFFEF4444).withOpacity(0.18)
-                      : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05)),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: leaveCount > 0
-                        ? const Color(0xFFEF4444).withOpacity(0.4)
-                        : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
-                  ),
-                ),
-                child: Text(
-                  'Keluar: $leaveCount/3',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: leaveCount > 0
-                        ? const Color(0xFFEF4444)
-                        : (isDark ? Colors.white70 : Colors.black54),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 6),
-
-              // Button Keluar di samping Score (Selesai Ujian)
-              InkWell(
-                onTap: onExit,
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444).withOpacity(0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.exit_to_app_rounded, size: 18, color: Color(0xFFEF4444)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 6),
-
-              // Menu Button Titik Tiga (...) dengan popup persis Kelvin Zhang Glisse Menu
-              Theme(
-                data: Theme.of(context).copyWith(
-                  cardColor: isDark ? const Color(0xFF1E2024) : Colors.white,
-                  popupMenuTheme: PopupMenuThemeData(
-                    color: isDark ? const Color(0xFF1E2024) : Colors.white,
-                    surfaceTintColor: Colors.transparent,
-                    elevation: 12,
-                    shadowColor: Colors.black.withOpacity(isDark ? 0.6 : 0.15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
-                      ),
-                    ),
-                  ),
-                ),
-                child: PopupMenuButton<String>(
-                  tooltip: 'Menu',
-                  offset: const Offset(0, 42),
-                  onSelected: (value) {
-                    if (value == 'info') {
-                      onInfo();
-                    } else if (value == 'exit') {
-                      onExit();
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    PopupMenuItem<String>(
-                      value: 'info',
-                      height: 42,
-                      child: Row(
+            if (_locked)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.96),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            size: 19,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          Icon(Icons.lock_outline, size: 56, color: theme.colorScheme.error),
+                          const SizedBox(height: 16),
+                          Text('Sesi dikunci', style: theme.textTheme.headlineSmall),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Aplikasi telah ditinggalkan tiga kali. Masukkan token lagi untuk memulai sesi uji baru.',
+                            textAlign: TextAlign.center,
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Informasi',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
+                          const SizedBox(height: 20),
+                          FilledButton(
+                            onPressed: _restartWithToken,
+                            child: const Text('Kembali ke token'),
                           ),
                         ],
                       ),
                     ),
-                    const PopupMenuDivider(height: 1),
-                    const PopupMenuItem<String>(
-                      value: 'exit',
-                      height: 42,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.exit_to_app_rounded,
-                            size: 19,
-                            color: Color(0xFFEF4444),
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            'Selesai',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFEF4444),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.06),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark ? Colors.white.withOpacity(0.18) : Colors.black.withOpacity(0.1),
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.more_horiz_rounded,
-                        size: 19,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-class _GlisseIconButton extends StatelessWidget {
-  const _GlisseIconButton({
-    required this.icon,
-    required this.isEnabled,
-    required this.tooltip,
-    required this.isDark,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final bool isEnabled;
-  final String tooltip;
-  final bool isDark;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    Color iconColor;
-    if (isEnabled) {
-      iconColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    } else {
-      iconColor = isDark ? Colors.white24 : Colors.black26;
-    }
-
-    return IconButton(
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.all(4),
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      icon: Icon(icon, size: 18),
-      color: iconColor,
-      tooltip: tooltip,
-      onPressed: onTap,
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.accentColor,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final Color accentColor;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.06),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: accentColor),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: isDark ? Colors.white60 : Colors.black54,
-                    fontSize: 11,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.2,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ),
     );
   }
