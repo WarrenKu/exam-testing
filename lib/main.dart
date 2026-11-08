@@ -56,6 +56,15 @@ class KioskService {
       return {};
     }
   }
+
+  static Future<bool> openUrl(String url) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('openUrl', {'url': url});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 class UjianKitaApp extends StatefulWidget {
@@ -407,12 +416,37 @@ class TestModeNotice extends StatelessWidget {
 class InformationPage extends StatelessWidget {
   const InformationPage({super.key});
 
+  Future<void> _openDeveloperUrl(BuildContext context) async {
+    const url = 'https://github.com/WarrenKu';
+    final opened = await KioskService.openUrl(url);
+    if (!opened && context.mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Developer'),
+          content: const Text('https://github.com/WarrenKu'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
       children: [
-        Text('Informasi ujian', style: Theme.of(context).textTheme.headlineMedium),
+        Text(
+          'Informasi ujian',
+          style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 20),
         const ListTile(
           leading: Icon(Icons.visibility_outlined),
@@ -428,6 +462,71 @@ class InformationPage extends StatelessWidget {
           leading: Icon(Icons.privacy_tip_outlined),
           title: Text('Data peserta'),
           subtitle: Text('Nama dan kelas dibaca otomatis saat diketik pada formulir Google Form.'),
+        ),
+
+        // Batas garis di bawah Data peserta
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Divider(thickness: 1.2),
+        ),
+
+        Text(
+          'Sistem & Pengembang',
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+
+        // Developer Link (Dapat di-klik ke github)
+        ListTile(
+          leading: const Icon(Icons.code_rounded),
+          title: const Text('Developer'),
+          subtitle: const Text('https://github.com/WarrenKu'),
+          trailing: const Icon(Icons.open_in_new_rounded, size: 20),
+          onTap: () => _openDeveloperUrl(context),
+        ),
+
+        // Versi Aplikasi
+        const ListTile(
+          leading: Icon(Icons.info_outline_rounded),
+          title: Text('Versi Aplikasi'),
+          subtitle: Text('v1.0.0 (Build 1) - Release SMAN18 Batam'),
+        ),
+
+        // Status Koneksi API (untuk Dashboard Super-Admin nanti)
+        ListTile(
+          leading: const Icon(Icons.cloud_done_outlined),
+          title: const Text('Status API'),
+          subtitle: const Text('Siap terhubung ke API Dashboard'),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16A34A).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.4)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF16A34A),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Online',
+                  style: TextStyle(
+                    color: Color(0xFF16A34A),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );

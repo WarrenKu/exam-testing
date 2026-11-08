@@ -66,6 +66,21 @@ class MainActivity : FlutterActivity() {
                         result.error("STATS_ERROR", e.message, null)
                     }
                 }
+                "openUrl" -> {
+                    try {
+                        val url = call.argument<String>("url")
+                        if (url != null) {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        } else {
+                            result.success(false)
+                        }
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
