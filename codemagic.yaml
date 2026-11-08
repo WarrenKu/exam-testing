@@ -5,20 +5,15 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Setup Android platform files
+      - name: Create Android platform files
         script: |
           rm -rf android
           flutter create --platforms=android --org id.ujian_kita --project-name ujian_kita_sman18 .
-          mkdir -p android/app/src/main/kotlin/id/ujian_kita/ujian_kita_sman18
           cp android-template/MainActivity.kt android/app/src/main/kotlin/id/ujian_kita/ujian_kita_sman18/MainActivity.kt
           cp android-template/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-          mkdir -p android/gradle/wrapper
-          cp android-template/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
-          cp android-template/gradle.properties android/gradle.properties
       - name: Install dependencies
         script: flutter pub get
       - name: Build test APK
-        script: |
-          flutter build apk --debug --android-skip-build-dependency-validation
+        script: flutter build apk --debug
     artifacts:
-      - build/**/outputs/**/*.apk
+      - build/app/outputs/flutter-apk/*.apk
