@@ -88,19 +88,38 @@ class UjianKitaApp extends StatefulWidget {
 class _UjianKitaAppState extends State<UjianKitaApp> {
   bool _isDark = false;
   bool _ignoreScheduleForTesting = true;
-  bool _useGlassBar = false;
+  bool _useGlassBar = true;
   bool _isReady = false;
+
+  bool _devModeUnlocked = false;
+  bool _devAntiScreenshot = true;
+  bool _devKioskPinning = true;
+  bool _devNoDetectViolations = false;
+  bool _devGuideLines = false;
 
   @override
   void initState() {
     super.initState();
     SharedPreferences.getInstance().then((prefs) {
       if (mounted) {
+        final today = DateTime.now().toIso8601String().substring(0, 10);
+        final savedDate = prefs.getString('dev_otp_date');
+        final isUnlocked = prefs.getBool('dev_mode_unlocked') ?? false;
+
         setState(() {
           _useGlassBar = prefs.getBool('use_glass_bar') ??
               prefs.getBool('use_liquid_glass') ??
-              false;
+              true;
+          _devModeUnlocked = isUnlocked && (savedDate == today);
+          _devAntiScreenshot = prefs.getBool('dev_anti_screenshot') ?? true;
+          _devKioskPinning = prefs.getBool('dev_kiosk_pinning') ?? true;
+          _devNoDetectViolations = prefs.getBool('dev_no_detect_violations') ?? false;
+          _devGuideLines = prefs.getBool('dev_guide_lines') ?? false;
         });
+
+        if (!_devAntiScreenshot) {
+          FlutterWindowManagerPlus.setSecure(false);
+        }
       }
     });
   }
@@ -110,6 +129,39 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setBool('use_glass_bar', value);
       prefs.setBool('use_liquid_glass', value);
+    });
+  }
+
+  void _updateDevModeUnlocked(bool value) {
+    setState(() => _devModeUnlocked = value);
+  }
+
+  void _updateDevAntiScreenshot(bool value) {
+    setState(() => _devAntiScreenshot = value);
+    FlutterWindowManagerPlus.setSecure(value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('dev_anti_screenshot', value);
+    });
+  }
+
+  void _updateDevKioskPinning(bool value) {
+    setState(() => _devKioskPinning = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('dev_kiosk_pinning', value);
+    });
+  }
+
+  void _updateDevNoDetectViolations(bool value) {
+    setState(() => _devNoDetectViolations = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('dev_no_detect_violations', value);
+    });
+  }
+
+  void _updateDevGuideLines(bool value) {
+    setState(() => _devGuideLines = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('dev_guide_lines', value);
     });
   }
 
@@ -126,10 +178,20 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
               isDark: _isDark,
               ignoreScheduleForTesting: _ignoreScheduleForTesting,
               useGlassBar: _useGlassBar,
+              devModeUnlocked: _devModeUnlocked,
+              devAntiScreenshot: _devAntiScreenshot,
+              devKioskPinning: _devKioskPinning,
+              devNoDetectViolations: _devNoDetectViolations,
+              devGuideLines: _devGuideLines,
               onThemeChanged: (value) => setState(() => _isDark = value),
               onTestingModeChanged: (value) =>
                   setState(() => _ignoreScheduleForTesting = value),
               onGlassBarChanged: _updateGlassBar,
+              onDevModeUnlockedChanged: _updateDevModeUnlocked,
+              onDevAntiScreenshotChanged: _updateDevAntiScreenshot,
+              onDevKioskPinningChanged: _updateDevKioskPinning,
+              onDevNoDetectViolationsChanged: _updateDevNoDetectViolations,
+              onDevGuideLinesChanged: _updateDevGuideLines,
             )
           : SplashScreen(
               onReady: () {
@@ -261,11 +323,13 @@ class FrostedGlassNavBar extends StatelessWidget {
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.isDark,
+    this.isGlass = true,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final bool isDark;
+  final bool isGlass;
 
   @override
   Widget build(BuildContext context) {
@@ -275,64 +339,68 @@ class FrostedGlassNavBar extends StatelessWidget {
       (Icons.settings_rounded, 'Pengaturan'),
     ];
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          decoration: BoxDecoration(
-            color: isDark
+    final navContent = Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? (isDark
                 ? const Color(0xFF0F172A).withOpacity(0.40)
-                : Colors.white.withOpacity(0.28),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.12)
-                  : Colors.white.withOpacity(0.45),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+                : Colors.white.withOpacity(0.28))
+            : (isDark
+                ? const Color(0xFF1E293B)
+                : Colors.white),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.12)
+              : (isGlass ? Colors.white.withOpacity(0.45) : const Color(0xFFE2E8F0)),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
-            children: List.generate(items.length, (index) {
-              final isSelected = selectedIndex == index;
-              final (icon, label) = items[index];
+        ],
+      ),
+      child: Row(
+        children: List.generate(items.length, (index) {
+          final isSelected = selectedIndex == index;
+          final (icon, label) = items[index];
 
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onDestinationSelected(index),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (isDark
-                                ? const Color(0xFF1E293B)
-                                : Colors.white)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onDestinationSelected(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isDark
+                            ? (isGlass ? const Color(0xFF1E293B) : const Color(0xFF334155))
+                            : Colors.white)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
@@ -342,9 +410,10 @@ class FrostedGlassNavBar extends StatelessWidget {
                                 ? (isDark ? Colors.white : const Color(0xFF0F172A))
                                 : (isDark ? Colors.white70 : const Color(0xFF64748B)),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             label,
+                            maxLines: 1,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
@@ -358,13 +427,136 @@ class FrostedGlassNavBar extends StatelessWidget {
                     ),
                   ),
                 ),
-              );
-            }),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+
+    if (isGlass) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: navContent,
+        ),
+      );
+    }
+    return navContent;
+  }
+}
+
+class DeveloperGuideLinesOverlay extends StatefulWidget {
+  const DeveloperGuideLinesOverlay({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<DeveloperGuideLinesOverlay> createState() =>
+      _DeveloperGuideLinesOverlayState();
+}
+
+class _DeveloperGuideLinesOverlayState
+    extends State<DeveloperGuideLinesOverlay> {
+  Offset _pointer = const Offset(180, 260);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        widget.child,
+        Positioned.fill(
+          child: IgnorePointer(
+            ignoring: true, // Tidak menghalangi tombol atau input di bawahnya
+            child: CustomPaint(
+              painter: _GuideLinesPainter(pointer: _pointer),
+            ),
           ),
         ),
+        // Handle lingkaran merah yang bisa digeser untuk mengatur posisi crosshair
+        Positioned(
+          left: (_pointer.dx - 18)
+              .clamp(8.0, MediaQuery.of(context).size.width - 44),
+          top: (_pointer.dy - 18)
+              .clamp(8.0, MediaQuery.of(context).size.height - 44),
+          child: GestureDetector(
+            onPanUpdate: (details) {
+              setState(() {
+                _pointer += details.delta;
+              });
+            },
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.85),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.drag_indicator_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GuideLinesPainter extends CustomPainter {
+  _GuideLinesPainter({required this.pointer});
+
+  final Offset pointer;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = const Color(0xFFEF4444).withOpacity(0.65)
+      ..strokeWidth = 1.0;
+
+    // Garis horizontal penunjuk
+    canvas.drawLine(
+        Offset(0, pointer.dy), Offset(size.width, pointer.dy), linePaint);
+    // Garis vertikal penunjuk
+    canvas.drawLine(
+        Offset(pointer.dx, 0), Offset(pointer.dx, size.height), linePaint);
+
+    // Keterangan koordinat X dan Y
+    final textSpan = TextSpan(
+      text: ' X: ${pointer.dx.toInt()} | Y: ${pointer.dy.toInt()} ',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        backgroundColor: Color(0xCC0F172A),
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        (pointer.dx + 8).clamp(8.0, size.width - textPainter.width - 8),
+        (pointer.dy + 8).clamp(8.0, size.height - textPainter.height - 8),
       ),
     );
   }
+
+  @override
+  bool shouldRepaint(_GuideLinesPainter oldDelegate) =>
+      oldDelegate.pointer != pointer;
 }
 
 class ExamShell extends StatefulWidget {
@@ -376,6 +568,16 @@ class ExamShell extends StatefulWidget {
     required this.onThemeChanged,
     required this.onTestingModeChanged,
     required this.onGlassBarChanged,
+    required this.devModeUnlocked,
+    required this.devAntiScreenshot,
+    required this.devKioskPinning,
+    required this.devNoDetectViolations,
+    required this.devGuideLines,
+    required this.onDevModeUnlockedChanged,
+    required this.onDevAntiScreenshotChanged,
+    required this.onDevKioskPinningChanged,
+    required this.onDevNoDetectViolationsChanged,
+    required this.onDevGuideLinesChanged,
   });
 
   final bool isDark;
@@ -384,6 +586,17 @@ class ExamShell extends StatefulWidget {
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<bool> onTestingModeChanged;
   final ValueChanged<bool> onGlassBarChanged;
+
+  final bool devModeUnlocked;
+  final bool devAntiScreenshot;
+  final bool devKioskPinning;
+  final bool devNoDetectViolations;
+  final bool devGuideLines;
+  final ValueChanged<bool> onDevModeUnlockedChanged;
+  final ValueChanged<bool> onDevAntiScreenshotChanged;
+  final ValueChanged<bool> onDevKioskPinningChanged;
+  final ValueChanged<bool> onDevNoDetectViolationsChanged;
+  final ValueChanged<bool> onDevGuideLinesChanged;
 
   @override
   State<ExamShell> createState() => _ExamShellState();
@@ -395,8 +608,16 @@ class _ExamShellState extends State<ExamShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      TokenPage(ignoreScheduleForTesting: widget.ignoreScheduleForTesting),
-      const InformationPage(),
+      TokenPage(
+        ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
+        devAntiScreenshot: widget.devAntiScreenshot,
+        devKioskPinning: widget.devKioskPinning,
+        devNoDetectViolations: widget.devNoDetectViolations,
+        devGuideLines: widget.devGuideLines,
+      ),
+      InformationPage(
+        onDevModeUnlockedChanged: widget.onDevModeUnlockedChanged,
+      ),
       SettingsPage(
         isDark: widget.isDark,
         ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
@@ -404,55 +625,60 @@ class _ExamShellState extends State<ExamShell> {
         onThemeChanged: widget.onThemeChanged,
         onTestingModeChanged: widget.onTestingModeChanged,
         onGlassBarChanged: widget.onGlassBarChanged,
+        devModeUnlocked: widget.devModeUnlocked,
+        devAntiScreenshot: widget.devAntiScreenshot,
+        devKioskPinning: widget.devKioskPinning,
+        devNoDetectViolations: widget.devNoDetectViolations,
+        devGuideLines: widget.devGuideLines,
+        onDevAntiScreenshotChanged: widget.onDevAntiScreenshotChanged,
+        onDevKioskPinningChanged: widget.onDevKioskPinningChanged,
+        onDevNoDetectViolationsChanged: widget.onDevNoDetectViolationsChanged,
+        onDevGuideLinesChanged: widget.onDevGuideLinesChanged,
       ),
     ];
-    return Scaffold(
-      extendBody: widget.useGlassBar,
+    final scaffold = Scaffold(
+      extendBody: true,
       body: SafeArea(
-        bottom: !widget.useGlassBar,
+        bottom: false,
         child: pages[_selectedIndex],
       ),
-      bottomNavigationBar: widget.useGlassBar
-          ? SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: FrostedGlassNavBar(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (value) => setState(() => _selectedIndex = value),
-                  isDark: widget.isDark,
-                ),
-              ),
-            )
-          : SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: NavigationBar(
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: (value) => setState(() => _selectedIndex = value),
-                      destinations: const [
-                        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Beranda'),
-                        NavigationDestination(icon: Icon(Icons.info_outline), selectedIcon: Icon(Icons.info), label: 'Informasi'),
-                        NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Pengaturan'),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: FrostedGlassNavBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (value) =>
+                setState(() => _selectedIndex = value),
+            isDark: widget.isDark,
+            isGlass: widget.useGlassBar,
+          ),
+        ),
+      ),
     );
+
+    if (widget.devGuideLines) {
+      return DeveloperGuideLinesOverlay(child: scaffold);
+    }
+    return scaffold;
   }
 }
 
 class TokenPage extends StatefulWidget {
-  const TokenPage({super.key, required this.ignoreScheduleForTesting});
+  const TokenPage({
+    super.key,
+    required this.ignoreScheduleForTesting,
+    this.devAntiScreenshot = true,
+    this.devKioskPinning = true,
+    this.devNoDetectViolations = false,
+    this.devGuideLines = false,
+  });
 
   final bool ignoreScheduleForTesting;
+  final bool devAntiScreenshot;
+  final bool devKioskPinning;
+  final bool devNoDetectViolations;
+  final bool devGuideLines;
 
   @override
   State<TokenPage> createState() => _TokenPageState();
@@ -482,7 +708,8 @@ class _TokenPageState extends State<TokenPage> {
     try {
       final exams = await TokenSheetRepository().loadByToken(enteredToken);
       if (exams.isEmpty) {
-        setState(() => _message = 'Token "$enteredToken" tidak ditemukan di jadwal ujian.');
+        setState(() =>
+            _message = 'Token "$enteredToken" tidak ditemukan di jadwal ujian.');
         return;
       }
       if (!mounted) return;
@@ -491,16 +718,24 @@ class _TokenPageState extends State<TokenPage> {
       if (exams.length == 1) {
         final exam = exams.first;
         if (exam.cleanFormUrl.isEmpty) {
-          setState(() => _message = 'Link soal untuk ${exam.subject.isEmpty ? 'mapel ini' : exam.subject} belum tersedia di Spreadsheet.');
+          setState(() => _message =
+              'Link soal untuk ${exam.subject.isEmpty ? 'mapel ini' : exam.subject} belum tersedia di Spreadsheet.');
           return;
         }
         if (!widget.ignoreScheduleForTesting && !exam.isScheduledToday) {
-          setState(() => _message = 'Ujian ini dijadwalkan pada hari ${exam.day}. Aktifkan "Mode uji jadwal" di Pengaturan untuk menguji hari ini.');
+          setState(() => _message =
+              'Ujian ini dijadwalkan pada hari ${exam.day}. Aktifkan "Mode uji jadwal" di Pengaturan untuk menguji hari ini.');
           return;
         }
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ExamSessionPage(exam: exam),
+            builder: (_) => ExamSessionPage(
+              exam: exam,
+              devAntiScreenshot: widget.devAntiScreenshot,
+              devKioskPinning: widget.devKioskPinning,
+              devNoDetectViolations: widget.devNoDetectViolations,
+              devGuideLines: widget.devGuideLines,
+            ),
           ),
         );
       } else {
@@ -510,6 +745,10 @@ class _TokenPageState extends State<TokenPage> {
             builder: (_) => ExamSelectionPage(
               exams: exams,
               ignoreScheduleForTesting: widget.ignoreScheduleForTesting,
+              devAntiScreenshot: widget.devAntiScreenshot,
+              devKioskPinning: widget.devKioskPinning,
+              devNoDetectViolations: widget.devNoDetectViolations,
+              devGuideLines: widget.devGuideLines,
             ),
           ),
         );
@@ -635,13 +874,18 @@ class TelegramDevService {
 }
 
 class DeveloperModeSection extends StatefulWidget {
-  const DeveloperModeSection({super.key});
+  const DeveloperModeSection({
+    super.key,
+    this.onDevModeUnlockedChanged,
+  });
+
+  final ValueChanged<bool>? onDevModeUnlockedChanged;
 
   @override
-  State<DeveloperModeSection> createState() => _DeveloperModeSectionState();
+  State<DeveloperModeSection> createState() => DeveloperModeSectionState();
 }
 
-class _DeveloperModeSectionState extends State<DeveloperModeSection> {
+class DeveloperModeSectionState extends State<DeveloperModeSection> {
   bool _isConnected = false;
   bool _isWaitingConnection = false;
   String? _telegramId;
@@ -672,15 +916,32 @@ class _DeveloperModeSectionState extends State<DeveloperModeSection> {
     super.initState();
     SharedPreferences.getInstance().then((prefs) {
       if (mounted) {
+        final today = DateTime.now().toIso8601String().substring(0, 10);
+        final savedDate = prefs.getString('dev_otp_date');
+        final isUnlocked = prefs.getBool('dev_mode_unlocked') ?? false;
+
         setState(() {
           _isConnected = prefs.getBool('dev_telegram_connected') ?? false;
           _telegramId = prefs.getString('dev_telegram_id');
           _telegramUsername = prefs.getString('dev_telegram_username');
           _telegramName = prefs.getString('dev_telegram_name');
-          _isDevUnlocked = prefs.getBool('dev_mode_unlocked') ?? false;
+          _isDevUnlocked = isUnlocked && (savedDate == today);
         });
       }
     });
+  }
+
+  /// Dipanggil otomatis saat user tap 5x dan Telegram sudah terhubung
+  Future<void> checkAndAutoSendOtpDaily() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final savedDate = prefs.getString('dev_otp_date');
+    final isUnlocked = prefs.getBool('dev_mode_unlocked') ?? false;
+    final isTodayActive = isUnlocked && (savedDate == today);
+
+    if (_isConnected && !isTodayActive) {
+      await _sendOtp();
+    }
   }
 
   @override
@@ -747,7 +1008,7 @@ class _DeveloperModeSectionState extends State<DeveloperModeSection> {
             // Kirim pesan sambutan pertama kali
             await TelegramDevService.sendMessage(
               chatId,
-              '🤖 Bot telah berhasil terhubung dengan perangkat Developer!\n\n'
+              'Bot telah berhasil terhubung dengan perangkat Developer!\n\n'
               'Nama: $firstName\n'
               'ID Telegram: $chatId\n\n'
               'Silakan kembali ke aplikasi UjianKita untuk verifikasi OTP.',
@@ -821,8 +1082,12 @@ class _DeveloperModeSectionState extends State<DeveloperModeSection> {
 
     if (entered == _currentOtp) {
       _currentOtp = null; // Sekali pakai
+      final today = DateTime.now().toIso8601String().substring(0, 10);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('dev_mode_unlocked', true);
+      await prefs.setString('dev_otp_date', today);
+
+      widget.onDevModeUnlockedChanged?.call(true);
 
       await TelegramDevService.sendMessage(
         _telegramId!,
@@ -856,6 +1121,9 @@ class _DeveloperModeSectionState extends State<DeveloperModeSection> {
     await prefs.remove('dev_telegram_name');
     await prefs.remove('dev_telegram_connected');
     await prefs.remove('dev_mode_unlocked');
+    await prefs.remove('dev_otp_date');
+
+    widget.onDevModeUnlockedChanged?.call(false);
 
     setState(() {
       _isConnected = false;
@@ -1189,7 +1457,12 @@ class _DeveloperModeSectionState extends State<DeveloperModeSection> {
 }
 
 class InformationPage extends StatefulWidget {
-  const InformationPage({super.key});
+  const InformationPage({
+    super.key,
+    this.onDevModeUnlockedChanged,
+  });
+
+  final ValueChanged<bool>? onDevModeUnlockedChanged;
 
   @override
   State<InformationPage> createState() => _InformationPageState();
@@ -1199,6 +1472,7 @@ class _InformationPageState extends State<InformationPage> {
   int _versionTapCount = 0;
   DateTime? _lastTapTime;
   bool _isDevPanelVisible = false;
+  final GlobalKey<DeveloperModeSectionState> _devKey = GlobalKey();
 
   void _onVersionTap() {
     final now = DateTime.now();
@@ -1216,6 +1490,11 @@ class _InformationPageState extends State<InformationPage> {
       setState(() {
         _isDevPanelVisible = !_isDevPanelVisible;
       });
+      if (_isDevPanelVisible) {
+        Future.delayed(const Duration(milliseconds: 250), () {
+          _devKey.currentState?.checkAndAutoSendOtpDaily();
+        });
+      }
     }
   }
 
@@ -1307,7 +1586,10 @@ class _InformationPageState extends State<InformationPage> {
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeInOutCubic,
           child: _isDevPanelVisible
-              ? const DeveloperModeSection()
+              ? DeveloperModeSection(
+                  key: _devKey,
+                  onDevModeUnlockedChanged: widget.onDevModeUnlockedChanged,
+                )
               : const SizedBox.shrink(),
         ),
 
@@ -1361,6 +1643,15 @@ class SettingsPage extends StatelessWidget {
     required this.onThemeChanged,
     required this.onTestingModeChanged,
     required this.onGlassBarChanged,
+    this.devModeUnlocked = false,
+    this.devAntiScreenshot = true,
+    this.devKioskPinning = true,
+    this.devNoDetectViolations = false,
+    this.devGuideLines = false,
+    this.onDevAntiScreenshotChanged,
+    this.onDevKioskPinningChanged,
+    this.onDevNoDetectViolationsChanged,
+    this.onDevGuideLinesChanged,
   });
 
   final bool isDark;
@@ -1369,6 +1660,16 @@ class SettingsPage extends StatelessWidget {
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<bool> onTestingModeChanged;
   final ValueChanged<bool> onGlassBarChanged;
+
+  final bool devModeUnlocked;
+  final bool devAntiScreenshot;
+  final bool devKioskPinning;
+  final bool devNoDetectViolations;
+  final bool devGuideLines;
+  final ValueChanged<bool>? onDevAntiScreenshotChanged;
+  final ValueChanged<bool>? onDevKioskPinningChanged;
+  final ValueChanged<bool>? onDevNoDetectViolationsChanged;
+  final ValueChanged<bool>? onDevGuideLinesChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1395,6 +1696,58 @@ class SettingsPage extends StatelessWidget {
           title: const Text('Bilah Navigasi Glass Transparan'),
           subtitle: const Text('Efek kaca mengambang semi-transparan dengan blur (Frosted Glass).'),
         ),
+        if (devModeUnlocked) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(thickness: 1.2),
+          ),
+          Row(
+            children: [
+              const Icon(Icons.developer_mode_rounded, color: Colors.blueAccent, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Opsi Pengembang (Developer)',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueAccent,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            value: devAntiScreenshot,
+            onChanged: onDevAntiScreenshotChanged,
+            title: const Text('Anti Screenshot (Redflag)'),
+            subtitle: const Text(
+              'Matikan untuk mengizinkan tangkapan layar / perekaman layar saat testing.',
+            ),
+          ),
+          SwitchListTile(
+            value: devKioskPinning,
+            onChanged: onDevKioskPinningChanged,
+            title: const Text('Mode Pin Layar (Kiosk)'),
+            subtitle: const Text(
+              'Matikan untuk menonaktifkan sematan layar otomatis (Screen Pinning).',
+            ),
+          ),
+          SwitchListTile(
+            value: devNoDetectViolations,
+            onChanged: onDevNoDetectViolationsChanged,
+            title: const Text('No Detect Pelanggaran'),
+            subtitle: const Text(
+              'Bypass batas 3x keluar aplikasi tanpa mengunci ujian saat testing.',
+            ),
+          ),
+          SwitchListTile(
+            value: devGuideLines,
+            onChanged: onDevGuideLinesChanged,
+            title: const Text('Garis Penunjuk Layar'),
+            subtitle: const Text(
+              'Tampilkan garis penunjuk presisi dan koordinat X/Y pada layar.',
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1405,10 +1758,18 @@ class ExamSelectionPage extends StatelessWidget {
     super.key,
     required this.exams,
     required this.ignoreScheduleForTesting,
+    this.devAntiScreenshot = true,
+    this.devKioskPinning = true,
+    this.devNoDetectViolations = false,
+    this.devGuideLines = false,
   });
 
   final List<ExamRecord> exams;
   final bool ignoreScheduleForTesting;
+  final bool devAntiScreenshot;
+  final bool devKioskPinning;
+  final bool devNoDetectViolations;
+  final bool devGuideLines;
 
   void _openExam(BuildContext context, ExamRecord exam) {
     if (exam.cleanFormUrl.isEmpty) {
@@ -1429,7 +1790,15 @@ class ExamSelectionPage extends StatelessWidget {
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ExamSessionPage(exam: exam)),
+      MaterialPageRoute(
+        builder: (_) => ExamSessionPage(
+          exam: exam,
+          devAntiScreenshot: devAntiScreenshot,
+          devKioskPinning: devKioskPinning,
+          devNoDetectViolations: devNoDetectViolations,
+          devGuideLines: devGuideLines,
+        ),
+      ),
     );
   }
 
@@ -1464,9 +1833,20 @@ class ExamSelectionPage extends StatelessWidget {
 }
 
 class ExamSessionPage extends StatefulWidget {
-  const ExamSessionPage({super.key, required this.exam});
+  const ExamSessionPage({
+    super.key,
+    required this.exam,
+    this.devAntiScreenshot = true,
+    this.devKioskPinning = true,
+    this.devNoDetectViolations = false,
+    this.devGuideLines = false,
+  });
 
   final ExamRecord exam;
+  final bool devAntiScreenshot;
+  final bool devKioskPinning;
+  final bool devNoDetectViolations;
+  final bool devGuideLines;
 
   @override
   State<ExamSessionPage> createState() => _ExamSessionPageState();
@@ -1485,12 +1865,14 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   @override
   void initState() {
     super.initState();
-    unawaited(_setScreenSecurity(true));
+    unawaited(_setScreenSecurity(widget.devAntiScreenshot));
     WidgetsBinding.instance.addObserver(this);
 
     // Kiosk Mode & Layar Penuh Immersive Sticky
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    unawaited(KioskService.startLockTask());
+    if (widget.devKioskPinning) {
+      unawaited(KioskService.startLockTask());
+    }
 
     _webController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -1535,7 +1917,9 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_setScreenSecurity(false));
-    unawaited(KioskService.stopLockTask());
+    if (widget.devKioskPinning) {
+      unawaited(KioskService.stopLockTask());
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -1548,6 +1932,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.devNoDetectViolations) return;
     if (state != AppLifecycleState.paused || _locked) return;
     setState(() {
       _leaveCount += 1;
@@ -1603,7 +1988,9 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
       ),
     );
     if (shouldExit == true && mounted) {
-      await KioskService.stopLockTask();
+      if (widget.devKioskPinning) {
+        await KioskService.stopLockTask();
+      }
       if (mounted) Navigator.of(context).pop();
     }
   }
@@ -1613,7 +2000,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     final theme = Theme.of(context);
     final subjectTitle = widget.exam.subject.isEmpty ? 'Ujian' : widget.exam.subject;
 
-    return PopScope(
+    final scaffold = PopScope(
       canPop: false,
       child: Scaffold(
         appBar: AppBar(
@@ -1737,6 +2124,11 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
         ),
       ),
     );
+
+    if (widget.devGuideLines) {
+      return DeveloperGuideLinesOverlay(child: scaffold);
+    }
+    return scaffold;
   }
 }
 
