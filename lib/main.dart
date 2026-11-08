@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:liquid_glass_bar/liquid_glass_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -317,136 +318,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-class FrostedGlassNavBar extends StatelessWidget {
-  const FrostedGlassNavBar({
-    super.key,
-    required this.selectedIndex,
-    required this.onDestinationSelected,
-    required this.isDark,
-    this.isGlass = true,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onDestinationSelected;
-  final bool isDark;
-  final bool isGlass;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (Icons.home_rounded, 'Beranda'),
-      (Icons.info_outline_rounded, 'Informasi'),
-      (Icons.settings_rounded, 'Pengaturan'),
-    ];
-
-    final navContent = Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        color: isGlass
-            ? (isDark
-                ? const Color(0xFF0F172A).withOpacity(0.40)
-                : Colors.white.withOpacity(0.28))
-            : (isDark
-                ? const Color(0xFF1E293B)
-                : Colors.white),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.12)
-              : (isGlass ? Colors.white.withOpacity(0.45) : const Color(0xFFE2E8F0)),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: List.generate(items.length, (index) {
-          final isSelected = selectedIndex == index;
-          final (icon, label) = items[index];
-
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onDestinationSelected(index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? (isDark
-                            ? (isGlass ? const Color(0xFF1E293B) : const Color(0xFF334155))
-                            : Colors.white)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            icon,
-                            size: 22,
-                            color: isSelected
-                                ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                : (isDark ? Colors.white70 : const Color(0xFF64748B)),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            label,
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                              color: isSelected
-                                  ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                  : (isDark ? Colors.white70 : const Color(0xFF64748B)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-
-    if (isGlass) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: navContent,
-        ),
-      );
-    }
-    return navContent;
-  }
-}
-
 class DeveloperGuideLinesOverlay extends StatefulWidget {
   const DeveloperGuideLinesOverlay({super.key, required this.child});
 
@@ -637,24 +508,73 @@ class _ExamShellState extends State<ExamShell> {
       ),
     ];
     final scaffold = Scaffold(
-      extendBody: true,
+      extendBody: widget.useGlassBar,
       body: SafeArea(
-        bottom: false,
+        bottom: !widget.useGlassBar,
         child: pages[_selectedIndex],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: FrostedGlassNavBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (value) =>
-                setState(() => _selectedIndex = value),
-            isDark: widget.isDark,
-            isGlass: widget.useGlassBar,
-          ),
-        ),
-      ),
+      bottomNavigationBar: widget.useGlassBar
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: LiquidGlassBar(
+                  items: const [
+                    LiquidGlassBarItem(
+                      iconData: Icons.home_rounded,
+                      label: 'Beranda',
+                    ),
+                    LiquidGlassBarItem(
+                      iconData: Icons.info_outline_rounded,
+                      label: 'Informasi',
+                    ),
+                    LiquidGlassBarItem(
+                      iconData: Icons.settings_rounded,
+                      label: 'Pengaturan',
+                    ),
+                  ],
+                  currentIndex: _selectedIndex,
+                  onTap: (index) => setState(() => _selectedIndex = index),
+                  style: const LiquidGlassBarStyle(
+                    height: 60.0,
+                    borderRadius: 32.0,
+                    activeColor: Colors.white,
+                  ),
+                ),
+              ),
+            )
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: NavigationBar(
+                      height: 65,
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: (value) =>
+                          setState(() => _selectedIndex = value),
+                      destinations: const [
+                        NavigationDestination(
+                            icon: Icon(Icons.home_outlined),
+                            selectedIcon: Icon(Icons.home),
+                            label: 'Beranda'),
+                        NavigationDestination(
+                            icon: Icon(Icons.info_outline),
+                            selectedIcon: Icon(Icons.info),
+                            label: 'Informasi'),
+                        NavigationDestination(
+                            icon: Icon(Icons.settings_outlined),
+                            selectedIcon: Icon(Icons.settings),
+                            label: 'Pengaturan'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
     );
 
     if (widget.devGuideLines) {
@@ -1693,8 +1613,8 @@ class SettingsPage extends StatelessWidget {
         SwitchListTile(
           value: useGlassBar,
           onChanged: onGlassBarChanged,
-          title: const Text('Bilah Navigasi Glass Transparan'),
-          subtitle: const Text('Efek kaca mengambang semi-transparan dengan blur (Frosted Glass).'),
+          title: const Text('Bilah Navigasi Liquid Glass'),
+          subtitle: const Text('Efek kaca mengambang semi-transparan dengan blur (Liquid Glass).'),
         ),
         if (devModeUnlocked) ...[
           const Padding(
