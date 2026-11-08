@@ -103,25 +103,49 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
     super.initState();
     SharedPreferences.getInstance().then((prefs) {
       if (mounted) {
-        final today = DateTime.now().toIso8601String().substring(0, 10);
-        final savedDate = prefs.getString('dev_otp_date');
-        final isUnlocked = prefs.getBool('dev_mode_unlocked') ?? false;
+        // RESET KHUSUS PENGEMBANG:
+        // Saat aplikasi di-restart atau dibuka ulang (cold start),
+        // semua opsi & toggle pengembang otomatis di-reset ke default aman
+        prefs.remove('dev_mode_unlocked');
+        prefs.remove('dev_anti_screenshot');
+        prefs.remove('dev_kiosk_pinning');
+        prefs.remove('dev_no_detect_violations');
+        prefs.remove('dev_guide_lines');
 
         setState(() {
+          // Setting reguler TETAP DISIMPAN (persisten)
           _useGlassBar = prefs.getBool('use_glass_bar') ??
               prefs.getBool('use_liquid_glass') ??
               true;
-          _devModeUnlocked = isUnlocked && (savedDate == today);
-          _devAntiScreenshot = prefs.getBool('dev_anti_screenshot') ?? true;
-          _devKioskPinning = prefs.getBool('dev_kiosk_pinning') ?? true;
-          _devNoDetectViolations = prefs.getBool('dev_no_detect_violations') ?? false;
-          _devGuideLines = prefs.getBool('dev_guide_lines') ?? false;
+          _isDark = prefs.getBool('is_dark') ?? false;
+          _ignoreScheduleForTesting =
+              prefs.getBool('ignore_schedule_for_testing') ?? true;
+
+          // Toggle pengembang SELALU RESET ke default aman
+          _devModeUnlocked = false;
+          _devAntiScreenshot = true;
+          _devKioskPinning = true;
+          _devNoDetectViolations = false;
+          _devGuideLines = false;
         });
 
-        if (!_devAntiScreenshot) {
-          FlutterWindowManagerPlus.setSecure(false);
-        }
+        // Pastikan keamanan layar aktif secara default
+        FlutterWindowManagerPlus.setSecure(true);
       }
+    });
+  }
+
+  void _updateTheme(bool value) {
+    setState(() => _isDark = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('is_dark', value);
+    });
+  }
+
+  void _updateTestingMode(bool value) {
+    setState(() => _ignoreScheduleForTesting = value);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('ignore_schedule_for_testing', value);
     });
   }
 
@@ -135,41 +159,29 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
 
   void _updateDevModeUnlocked(bool value) {
     setState(() => _devModeUnlocked = value);
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('dev_mode_unlocked', value);
-      if (!value) {
+    if (!value) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.remove('dev_mode_unlocked');
         prefs.remove('dev_otp_date');
-      }
-    });
+      });
+    }
   }
 
   void _updateDevAntiScreenshot(bool value) {
     setState(() => _devAntiScreenshot = value);
     FlutterWindowManagerPlus.setSecure(value);
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('dev_anti_screenshot', value);
-    });
   }
 
   void _updateDevKioskPinning(bool value) {
     setState(() => _devKioskPinning = value);
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('dev_kiosk_pinning', value);
-    });
   }
 
   void _updateDevNoDetectViolations(bool value) {
     setState(() => _devNoDetectViolations = value);
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('dev_no_detect_violations', value);
-    });
   }
 
   void _updateDevGuideLines(bool value) {
     setState(() => _devGuideLines = value);
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool('dev_guide_lines', value);
-    });
   }
 
   @override
@@ -190,9 +202,8 @@ class _UjianKitaAppState extends State<UjianKitaApp> {
               devKioskPinning: _devKioskPinning,
               devNoDetectViolations: _devNoDetectViolations,
               devGuideLines: _devGuideLines,
-              onThemeChanged: (value) => setState(() => _isDark = value),
-              onTestingModeChanged: (value) =>
-                  setState(() => _ignoreScheduleForTesting = value),
+              onThemeChanged: _updateTheme,
+              onTestingModeChanged: _updateTestingMode,
               onGlassBarChanged: _updateGlassBar,
               onDevModeUnlockedChanged: _updateDevModeUnlocked,
               onDevAntiScreenshotChanged: _updateDevAntiScreenshot,
