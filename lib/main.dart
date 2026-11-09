@@ -1674,6 +1674,48 @@ class SettingsPage extends StatelessWidget {
           title: const Text('Bilah Navigasi Liquid Glass'),
           subtitle: const Text('Efek kaca mengambang semi-transparan dengan blur (Liquid Glass).'),
         ),
+        ListTile(
+          leading: const Icon(Icons.dns_outlined),
+          title: const Text('Server Realtime Dashboard'),
+          subtitle: FutureBuilder<String>(
+            future: SharedPreferences.getInstance().then(
+                (p) => p.getString('dashboard_server_url') ?? 'http://10.0.2.2:3000'),
+            builder: (ctx, snap) => Text(snap.data ?? 'http://10.0.2.2:3000'),
+          ),
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            final currentUrl =
+                prefs.getString('dashboard_server_url') ?? 'http://10.0.2.2:3000';
+            final controller = TextEditingController(text: currentUrl);
+            if (!context.mounted) return;
+            final newUrl = await showDialog<String>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Alamat Server Dashboard'),
+                content: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: 'URL Server (contoh: http://192.168.1.100:3000)',
+                    hintText: 'http://10.0.2.2:3000',
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Batal')),
+                  FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(ctx, controller.text.trim()),
+                      child: const Text('Simpan')),
+                ],
+              ),
+            );
+            if (newUrl != null && newUrl.isNotEmpty) {
+              await prefs.setString('dashboard_server_url', newUrl);
+              (context as Element).markNeedsBuild();
+            }
+          },
+        ),
         if (devModeUnlocked) ...[
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -1847,6 +1889,46 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   bool _canGoBack = false;
   bool _canGoForward = false;
   String? _webError;
+  Timer? _telemetryTimer;
+  String _deviceId = '';
+
+  Future<void> _sendTelemetry({String? overrideStatus, int? overrideLeaveCount}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serverUrl = prefs.getString('dashboard_server_url')?.trim() ?? 'http://10.0.2.2:3000';
+      if (serverUrl.isEmpty) return;
+
+      final stats = await KioskService.getStats();
+      final currentStatus = overrideStatus ??
+          (_locked
+              ? 'terkunci'
+              : (_leaveCount > 0 ? 'keluar' : 'mengerjakan'));
+      final currentLeave = overrideLeaveCount ?? _leaveCount;
+
+      final payload = {
+        'deviceId': _deviceId.isNotEmpty ? _deviceId : _deviceLabel,
+        'name': _name,
+        'className': _className,
+        'subject': widget.exam.subject,
+        'deviceLabel': _deviceLabel,
+        'status': currentStatus,
+        'leaveCount': currentLeave,
+        'batteryLevel': stats['batteryLevel'] ?? 85,
+        'isCharging': stats['isCharging'] ?? false,
+        'temperature': stats['temperature'] ?? 36.0,
+        'network': stats['network'] ?? 'Wi-Fi',
+      };
+
+      final uri = Uri.parse('$serverUrl/api/telemetry');
+      await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {}
+  }
 
   Future<void> _checkNavigationHistory() async {
     if (!mounted) return;
@@ -1916,10 +1998,14 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     }
 
     _readDeviceLabel();
+    _telemetryTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _sendTelemetry();
+    });
   }
 
   @override
   void dispose() {
+    _telemetryTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_setScreenSecurity(false));
     if (widget.devKioskPinning) {
@@ -1943,17 +2029,30 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
       _leaveCount += 1;
       _locked = _leaveCount >= 3;
     });
+    _sendTelemetry(
+      overrideStatus: _locked ? 'terkunci' : 'keluar',
+      overrideLeaveCount: _leaveCount,
+    );
   }
 
   Future<void> _readDeviceLabel() async {
     try {
       final info = await DeviceInfoPlugin().androidInfo;
       if (mounted) {
-        setState(() => _deviceLabel = '${info.manufacturer} ${info.model}');
+        setState(() {
+          _deviceLabel = '${info.manufacturer} ${info.model}';
+          _deviceId = info.id.isNotEmpty ? info.id : '${info.manufacturer}_${info.model}';
+        });
       }
     } catch (_) {
-      if (mounted) setState(() => _deviceLabel = 'Android Device');
+      if (mounted) {
+        setState(() {
+          _deviceLabel = 'Android Device';
+          _deviceId = 'DEV_${DateTime.now().millisecondsSinceEpoch}';
+        });
+      }
     }
+    _sendTelemetry(overrideStatus: 'mengerjakan');
   }
 
   void _readIdentity(JavaScriptMessage message) {
@@ -1970,6 +2069,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
         if (data['key'] == 'class') _className = value;
       });
       debugPrint('Sesi Terdeteksi: $_name ($_className) - $_deviceLabel');
+      _sendTelemetry();
     } catch (_) {}
   }
 
@@ -1998,6 +2098,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
       ),
     );
     if (shouldExit == true && mounted) {
+      unawaited(_sendTelemetry(overrideStatus: 'selesai'));
       if (widget.devKioskPinning) {
         await KioskService.stopLockTask();
       }
