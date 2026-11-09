@@ -1062,10 +1062,6 @@ export default function App() {
                       <span>Auto-Purge Inaktif</span>
                       <strong>18 Detik Tanpa Heartbeat</strong>
                     </div>
-                    <div className="info-stat-row">
-                      <span>Antarmuka UI</span>
-                      <strong>{liquidGlassEnabled ? 'Liquid Glasses (Apple iOS)' : 'Standar (Modern Graphite)'}</strong>
-                    </div>
                   </div>
                 </Panel>
 

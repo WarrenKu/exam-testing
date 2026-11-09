@@ -1962,7 +1962,7 @@ body {
 /* Menu Card Popover position (opens UPWARDS) */
 .mobile-companion-action .lg-menu-card {
   top: auto !important;
-  bottom: 68px !important;
+  bottom: 64px !important;
   right: 0 !important;
   transform-origin: calc(100% - 24px) 100% !important;
   box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.8) !important;
@@ -1975,6 +1975,23 @@ body {
   background: rgba(20, 20, 24, 0.95) !important;
   backdrop-filter: blur(24px) !important;
   -webkit-backdrop-filter: blur(24px) !important;
+}
+
+/* Hilangkan delay trailing kotak hitam saat menu ditutup (Instant Clean Dismissal) */
+.lg-menu-card[data-phase="leaving"],
+.mobile-companion-action .lg-menu-card[data-phase="leaving"],
+.topbar-menu-wrapper .lg-menu-card[data-phase="leaving"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+.lg-menu-card[data-phase="leaving"] * {
+  display: none !important;
+  opacity: 0 !important;
 }
 
 /* ==========================================================================
