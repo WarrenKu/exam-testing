@@ -830,36 +830,91 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Status Metric Grid */}
-              <div className="metrics-grid">
-                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('all'); }}>
-                  <div className="metric-box-title">Total Terhubung</div>
-                  <div className="metric-box-val">{counts.total}</div>
-                  <div className="metric-box-desc">Peserta Aktif di Server</div>
+              {/* Summary Metrics Section (UI Sebelumnya) */}
+              <div className="summary-section">
+                <Panel
+                  isGlass={liquidGlassEnabled}
+                  className="stat-card"
+                  onClick={() => {
+                    setActiveTab('monitoring');
+                    setFilter('all');
+                  }}
+                >
+                  <div className="stat-icon-wrap all-icon">
+                    <Users size={22} color="#F0EFEA" />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{counts.total}</div>
+                    <div className="stat-label">Total Siswa Aktif</div>
+                  </div>
                 </Panel>
 
-                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('mengerjakan'); }}>
-                  <div className="metric-box-title color-green">🟢 Mengerjakan</div>
-                  <div className="metric-box-val color-green">{counts.mengerjakan}</div>
-                  <div className="metric-box-desc">Fokus di Layar Soal</div>
+                <Panel
+                  isGlass={liquidGlassEnabled}
+                  className="stat-card"
+                  onClick={() => {
+                    setActiveTab('monitoring');
+                    setFilter('mengerjakan');
+                  }}
+                >
+                  <div className="stat-icon-wrap green-icon">
+                    <span className="status-dot green-dot"></span>
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value text-green">{counts.mengerjakan}</div>
+                    <div className="stat-label">🟢 Mengerjakan</div>
+                  </div>
                 </Panel>
 
-                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('keluar'); }}>
-                  <div className="metric-box-title color-yellow">🟡 Keluar Aplikasi</div>
-                  <div className="metric-box-val color-yellow">{counts.keluar}</div>
-                  <div className="metric-box-desc">Peringatan Terdeteksi (1-2x)</div>
+                <Panel
+                  isGlass={liquidGlassEnabled}
+                  className="stat-card"
+                  onClick={() => {
+                    setActiveTab('monitoring');
+                    setFilter('keluar');
+                  }}
+                >
+                  <div className="stat-icon-wrap yellow-icon">
+                    <span className="status-dot yellow-dot"></span>
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value text-yellow">{counts.keluar}</div>
+                    <div className="stat-label">🟡 Keluar Aplikasi</div>
+                  </div>
                 </Panel>
 
-                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('terkunci'); }}>
-                  <div className="metric-box-title color-red">🔴 Sesi Terkunci</div>
-                  <div className="metric-box-val color-red">{counts.terkunci}</div>
-                  <div className="metric-box-desc">Melanggar Batas 3x Keluar</div>
+                <Panel
+                  isGlass={liquidGlassEnabled}
+                  className="stat-card"
+                  onClick={() => {
+                    setActiveTab('monitoring');
+                    setFilter('terkunci');
+                  }}
+                >
+                  <div className="stat-icon-wrap red-icon">
+                    <span className="status-dot red-dot"></span>
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value text-red">{counts.terkunci}</div>
+                    <div className="stat-label">🔴 Sesi Terkunci</div>
+                  </div>
                 </Panel>
 
-                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('selesai'); }}>
-                  <div className="metric-box-title color-blue">🔵 Selesai Ujian</div>
-                  <div className="metric-box-val color-blue">{counts.selesai}</div>
-                  <div className="metric-box-desc">Telah Kirim Jawaban</div>
+                <Panel
+                  isGlass={liquidGlassEnabled}
+                  className="stat-card"
+                  onClick={() => {
+                    setActiveTab('monitoring');
+                    setFilter('selesai');
+                  }}
+                >
+                  <div className="stat-icon-wrap blue-icon">
+                    <span className="status-dot blue-dot"></span>
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value text-blue">{counts.selesai}</div>
+                    <div className="stat-label">🔵 Selesai Ujian</div>
+                  </div>
                 </Panel>
               </div>
 
@@ -896,23 +951,22 @@ export default function App() {
                     <h3>Aksi Cepat Super-Admin</h3>
                   </div>
                   <div className="banner-card-body">
-                    <p style={{ fontSize: 13, color: 'var(--text-concrete)', marginBottom: 12 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-concrete)', marginBottom: 14 }}>
                       Gunakan tombol berikut untuk kontrol massal sesi seluruh siswa:
                     </p>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <Button variant="glass" icon={<Unlock size={14} />} onClick={handleUnlockAll}>
-                        Buka Kunci Semua Siswa
-                      </Button>
-                      <Button variant="glass" icon={<Download size={14} />} onClick={handleExportCSV}>
-                        Unduh Laporan CSV
-                      </Button>
-                      <Button
-                        variant="glass"
-                        icon={<Monitor size={14} />}
-                        onClick={() => setActiveTab('monitoring')}
-                      >
-                        Buka Layar Monitoring
-                      </Button>
+                    <div className="quick-action-buttons">
+                      <button className="dashboard-action-btn" onClick={handleUnlockAll}>
+                        <Unlock size={15} />
+                        <span>Buka Kunci Semua Siswa</span>
+                      </button>
+                      <button className="dashboard-action-btn" onClick={handleExportCSV}>
+                        <Download size={15} />
+                        <span>Unduh Laporan CSV</span>
+                      </button>
+                      <button className="dashboard-action-btn" onClick={() => setActiveTab('monitoring')}>
+                        <Monitor size={15} />
+                        <span>Buka Layar Monitoring</span>
+                      </button>
                     </div>
                   </div>
                 </Panel>
@@ -1571,9 +1625,10 @@ export default function App() {
                     <h4>Endpoint Telemetry APK Siswa</h4>
                     <p>{`http://${window.location.host}/api/telemetry`}</p>
                   </div>
-                  <Button variant="glass" icon={copiedEndpoint ? <Check size={16} /> : <Copy size={16} />} onClick={copyEndpoint}>
-                    {copiedEndpoint ? 'Tersalin!' : 'Salin URL'}
-                  </Button>
+                  <button className="ui-action-btn" onClick={copyEndpoint}>
+                    {copiedEndpoint ? <Check size={16} color="#10B981" /> : <Copy size={16} />}
+                    <span>{copiedEndpoint ? 'Tersalin!' : 'Salin URL'}</span>
+                  </button>
                 </div>
 
                 <div className="setting-sep"></div>
@@ -1671,13 +1726,13 @@ export default function App() {
                   {selectedStudent.deviceLabel} · {selectedStudent.subject || 'Ujian Sekolah'}
                 </div>
               </div>
-              <Button
-                variant="glass"
+              <button
+                className="modal-close-btn"
                 onClick={() => setSelectedStudentId(null)}
-                style={{ width: 36, height: 36, padding: 0 }}
+                aria-label="Tutup"
               >
                 ✕
-              </Button>
+              </button>
             </div>
 
             <div className={`card-status-badge ${getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount).className}`}>
@@ -1751,9 +1806,9 @@ export default function App() {
                   Buka Kunci Sesi Jarak Jauh
                 </Button>
               )}
-              <Button variant="glass" onClick={() => setSelectedStudentId(null)}>
+              <button className="ui-action-btn" onClick={() => setSelectedStudentId(null)}>
                 Tutup
-              </Button>
+              </button>
             </div>
           </Panel>
         </div>
@@ -1780,13 +1835,13 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <Button
-                variant="glass"
+              <button
+                className="modal-close-btn"
                 onClick={() => setSelectedTeacherForDetail(null)}
-                style={{ width: 36, height: 36, padding: 0 }}
+                aria-label="Tutup"
               >
                 ✕
-              </Button>
+              </button>
             </div>
 
             {selectedTeacherForDetail.isSuperAdmin && (
@@ -1872,27 +1927,27 @@ export default function App() {
             <div className="modal-footer">
               {!selectedTeacherForDetail.isSuperAdmin && (
                 <>
-                  <Button
-                    variant="glass"
+                  <button
+                    className="ui-action-btn"
                     onClick={() => handleToggleTeacherStatus(selectedTeacherForDetail.id)}
                   >
                     {selectedTeacherForDetail.status === 'Aktif' ? 'Nonaktifkan Akun' : 'Aktifkan Akun'}
-                  </Button>
-                  <Button
-                    variant="glass"
-                    tint="#F59E0B"
+                  </button>
+                  <button
+                    className="ui-action-btn"
+                    style={{ borderColor: 'rgba(245, 158, 11, 0.5)', color: '#F59E0B' }}
                     onClick={() => {
                       handleResetTeacherPassword(selectedTeacherForDetail);
                       setSelectedTeacherForDetail(null);
                     }}
                   >
                     Reset Password
-                  </Button>
+                  </button>
                 </>
               )}
-              <Button variant="glass" onClick={() => setSelectedTeacherForDetail(null)}>
+              <button className="ui-action-btn" onClick={() => setSelectedTeacherForDetail(null)}>
                 Tutup
-              </Button>
+              </button>
             </div>
           </Panel>
         </div>
@@ -1909,13 +1964,13 @@ export default function App() {
                 <div className="modal-name">Tambah Akun Guru / Petugas Baru</div>
                 <div className="modal-sub">Daftarkan dewan guru, proktor, atau pengawas ujian baru ke sistem.</div>
               </div>
-              <Button
-                variant="glass"
+              <button
+                className="modal-close-btn"
                 onClick={() => setShowAddTeacherModal(false)}
-                style={{ width: 36, height: 36, padding: 0 }}
+                aria-label="Tutup"
               >
                 ✕
-              </Button>
+              </button>
             </div>
 
             <form onSubmit={handleCreateTeacher} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1980,9 +2035,9 @@ export default function App() {
               </div>
 
               <div className="modal-footer" style={{ marginTop: 10 }}>
-                <Button variant="glass" type="button" onClick={() => setShowAddTeacherModal(false)}>
+                <button className="ui-action-btn" type="button" onClick={() => setShowAddTeacherModal(false)}>
                   Batal
-                </Button>
+                </button>
                 <Button variant="filled" tint="#10B981" type="submit">
                   Simpan Akun Guru
                 </Button>

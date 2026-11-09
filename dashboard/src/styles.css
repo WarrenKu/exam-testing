@@ -398,44 +398,225 @@ body {
   color: var(--text-concrete);
 }
 
-/* Metrics Grid */
-.metrics-grid {
+/* ==========================================================================
+   METRICS SUMMARY SECTION (Restored UI Sebelumnya)
+   ========================================================================== */
+.summary-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
   margin-bottom: 24px;
 }
 
-.metric-box {
+.stat-card {
   padding: 18px 20px;
   border-radius: 20px;
-  cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: transform 0.25s ease;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
 }
 
-.metric-box:hover {
+.stat-card:hover {
   transform: translateY(-2px);
 }
 
-.metric-box-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-concrete);
+.stat-icon-wrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-graphite);
+  flex-shrink: 0;
 }
 
-.metric-box-val {
-  font-size: 30px;
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 26px;
   font-weight: 800;
-  font-family: var(--font-mono);
+  letter-spacing: -0.5px;
   color: var(--text-bone);
+  font-family: var(--font-mono);
+  line-height: 1.1;
 }
 
-.metric-box-desc {
-  font-size: 11px;
+.stat-label {
+  font-size: 12px;
   color: var(--text-concrete);
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+/* Glowing dots for stat cards */
+.status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.green-dot {
+  background-color: var(--status-green);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.yellow-dot {
+  background-color: var(--status-yellow);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.red-dot {
+  background-color: var(--status-red);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+.blue-dot {
+  background-color: var(--status-blue);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.green-icon { background: rgba(16, 185, 129, 0.15) !important; border: 1px solid rgba(16, 185, 129, 0.3); }
+.yellow-icon { background: rgba(245, 158, 11, 0.15) !important; border: 1px solid rgba(245, 158, 11, 0.3); }
+.red-icon { background: rgba(239, 68, 68, 0.15) !important; border: 1px solid rgba(239, 68, 68, 0.3); }
+.blue-icon { background: rgba(59, 130, 246, 0.15) !important; border: 1px solid rgba(59, 130, 246, 0.3); }
+.all-icon { background: rgba(240, 239, 234, 0.08) !important; border: 1px solid rgba(240, 239, 234, 0.15); }
+
+/* Quick Action Buttons (Replaces hardcoded glass buttons) */
+.quick-action-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-action-btn,
+.ui-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.liquid-mode .dashboard-action-btn,
+.liquid-mode .ui-action-btn {
+  background: var(--lg-glass, rgba(41, 41, 41, 0.52));
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid var(--lg-edge, rgba(240, 239, 234, 0.15));
+  color: var(--text-bone);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.liquid-mode .dashboard-action-btn:hover,
+.liquid-mode .ui-action-btn:hover {
+  background: rgba(60, 60, 60, 0.75);
+  border-color: rgba(240, 239, 234, 0.3);
+  transform: translateY(-1px);
+}
+
+.standard-mode .dashboard-action-btn,
+.standard-mode .ui-action-btn {
+  background: #202024;
+  border: 1px solid #38383e;
+  color: var(--text-bone);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.standard-mode .dashboard-action-btn:hover,
+.standard-mode .ui-action-btn:hover {
+  background: #2b2b30;
+  border-color: rgba(240, 239, 234, 0.25);
+  transform: translateY(-1px);
+}
+
+.modal-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-graphite);
+  color: var(--text-bone);
+  border: 1px solid rgba(240, 239, 234, 0.15);
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(60, 60, 60, 0.8);
+}
+
+/* STRICT STANDARD MODE: Strip ALL liquid glass from everything */
+.standard-mode,
+.standard-mode * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.standard-mode {
+  background-image: none !important;
+}
+
+.standard-mode .standard-panel,
+.standard-mode .stat-card,
+.standard-mode .banner-card,
+.standard-mode .search-filter-panel,
+.standard-mode .user-table-wrapper,
+.standard-mode .settings-card,
+.standard-mode .stat-box,
+.standard-mode .system-detail-panel,
+.standard-mode .api-status-row,
+.standard-mode .student-card,
+.standard-mode .modal-card,
+.standard-mode .quad-cell,
+.standard-mode .privacy-guard-card,
+.standard-mode .login-card {
+  background: #141416 !important;
+  border: 1px solid #28282b !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+}
+
+.standard-mode .lg-button,
+.standard-mode button.lg-button,
+.standard-mode [data-variant="glass"],
+.standard-mode .lg-switch,
+.standard-mode .lg-tabbar,
+.standard-mode .lg-segmented-control,
+.standard-mode .topbar-demo-switch,
+.standard-mode .admin-avatar-pill {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.standard-mode .lg-button,
+.standard-mode button.lg-button,
+.standard-mode [data-variant="glass"] {
+  background: #202024 !important;
+  border: 1px solid #38383e !important;
+  color: var(--text-bone) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+.standard-mode .lg-button:hover,
+.standard-mode button.lg-button:hover,
+.standard-mode [data-variant="glass"]:hover {
+  background: #2b2b30 !important;
+  border-color: rgba(240, 239, 234, 0.25) !important;
 }
 
 .color-green { color: var(--status-green) !important; }
