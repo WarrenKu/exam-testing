@@ -129,6 +129,7 @@ export default function App() {
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginStatus, setLoginStatus] = useState('idle'); // 'idle' | 'checking' | 'verified'
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('ujiankita_user') || 'null');
@@ -144,9 +145,9 @@ export default function App() {
   const [viewAsRole, setViewAsRole] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem('ujiankita_user') || 'null');
-      return (u && u.isSuperAdmin) ? 'superadmin' : 'regular';
+      return Boolean(u && u.isSuperAdmin) ? 'superadmin' : 'regular';
     } catch (e) {
-      return 'superadmin';
+      return 'regular';
     }
   }); // 'superadmin' vs 'regular'
   const [selectedTeacherForDetail, setSelectedTeacherForDetail] = useState(null);
@@ -205,6 +206,18 @@ export default function App() {
     setShowAddTeacherModal(false);
   }, [activeTab]);
 
+  // Otomatis cegah akun regular/guru mengakses tab Akun Super-Admin
+  useEffect(() => {
+    if (activeTab === 'account' && !currentUser?.isSuperAdmin) {
+      setActiveTab('users');
+    }
+  }, [activeTab, currentUser]);
+
+  // Sinkronkan viewAsRole dengan currentUser
+  useEffect(() => {
+    setViewAsRole(currentUser?.isSuperAdmin ? 'superadmin' : 'regular');
+  }, [currentUser]);
+
   // Persist Liquid Glasses preference (Default OFF)
   useEffect(() => {
     localStorage.setItem('ujiankita_liquid_glasses', liquidGlassEnabled ? 'true' : 'false');
@@ -216,8 +229,8 @@ export default function App() {
   }, [soundAlertEnabled]);
 
   // Realtime Server Health & Inter-communication Check
-  const checkServerHealth = useCallback(async () => {
-    setIsCheckingHealth(true);
+  const checkServerHealth = useCallback(async (manual = false) => {
+    if (manual) setIsCheckingHealth(true);
     const start = performance.now();
     try {
       const res = await fetch('/api/health', { cache: 'no-store' });
@@ -228,20 +241,18 @@ export default function App() {
         setLastHealthCheck(new Date().toLocaleTimeString('id-ID'));
       } else {
         setServerStatus('offline');
-        setLastHealthCheck(new Date().toLocaleTimeString('id-ID'));
       }
     } catch {
       setServerStatus('offline');
-      setLastHealthCheck(new Date().toLocaleTimeString('id-ID'));
     } finally {
-      setIsCheckingHealth(false);
+      if (manual) setIsCheckingHealth(false);
     }
   }, []);
 
-  // Periodically verify inter-server communication
+  // Periodically verify inter-server communication (silent 25s interval, no UI re-render jitter)
   useEffect(() => {
-    checkServerHealth();
-    const timer = setInterval(checkServerHealth, 6000);
+    checkServerHealth(false);
+    const timer = setInterval(() => checkServerHealth(false), 25000);
     return () => clearInterval(timer);
   }, [checkServerHealth]);
 
@@ -406,7 +417,10 @@ export default function App() {
   // Authentication Handlers
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loginStatus === 'checking') return;
     setLoginError('');
+    setLoginStatus('checking');
+
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
@@ -415,17 +429,23 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok && data.success && data.token) {
+        setLoginStatus('verified');
         localStorage.setItem('ujiankita_superadmin_token', data.token);
         if (data.user) {
           localStorage.setItem('ujiankita_user', JSON.stringify(data.user));
           setCurrentUser(data.user);
           setViewAsRole(data.user.isSuperAdmin ? 'superadmin' : 'regular');
         }
-        setToken(data.token);
+        setTimeout(() => {
+          setToken(data.token);
+          setLoginStatus('idle');
+        }, 550);
       } else {
-        setLoginError(data.message || 'Kode Guru atau password salah.');
+        setLoginStatus('idle');
+        setLoginError(data.message || 'Kode Guru atau password salah. Silakan periksa spreadsheet.');
       }
     } catch (err) {
+      setLoginStatus('idle');
       setLoginError('Gagal terhubung ke server backend.');
     }
   };
@@ -443,6 +463,7 @@ export default function App() {
     localStorage.removeItem('ujiankita_user');
     setToken('');
     setCurrentUser(null);
+    setViewAsRole('regular');
     setStudents([]);
     setSelectedStudentId(null);
   };
@@ -787,7 +808,7 @@ export default function App() {
 
   // Shared Admin Menu Items (Used in Desktop topbar and Mobile bottom navbar)
   const adminMenuItems = useMemo(() => {
-    const isSuper = viewAsRole === 'superadmin';
+    const isSuper = Boolean(currentUser?.isSuperAdmin);
     const items = [
       { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
       { label: 'Siaran Pengumuman Massal', icon: <Radio size={15} />, onSelect: () => setShowBroadcastAllModal(true) },
@@ -943,11 +964,36 @@ export default function App() {
 
             <Button
               variant="filled"
-              tint="#0284C7"
+              tint={loginStatus === 'verified' ? '#10B981' : '#0284C7'}
               type="submit"
-              style={{ width: '100%', height: 44, marginTop: 8 }}
+              disabled={loginStatus === 'checking'}
+              style={{
+                width: '100%',
+                height: 44,
+                marginTop: 8,
+                opacity: loginStatus === 'checking' ? 0.85 : 1,
+                cursor: loginStatus === 'checking' ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
             >
-              Masuk ke Portal
+              {loginStatus === 'checking' && (
+                <>
+                  <RefreshCw size={16} className="spin-icon" />
+                  <span>Memeriksa Kredensial & Otorisasi...</span>
+                </>
+              )}
+              {loginStatus === 'verified' && (
+                <>
+                  <CheckCircle2 size={16} />
+                  <span>Kredensial Cocok! Menghubungkan...</span>
+                </>
+              )}
+              {loginStatus === 'idle' && (
+                <span>Masuk ke Portal</span>
+              )}
             </Button>
           </form>
 
@@ -1036,13 +1082,15 @@ export default function App() {
             AKUN & KONTROL
           </div>
 
-          <button
-            className={`sidebar-nav-item ${activeTab === 'account' ? 'active' : ''}`}
-            onClick={() => setActiveTab('account')}
-          >
-            <ShieldCheck size={18} />
-            <span>Akun Super-Admin</span>
-          </button>
+          {currentUser?.isSuperAdmin && (
+            <button
+              className={`sidebar-nav-item ${activeTab === 'account' ? 'active' : ''}`}
+              onClick={() => setActiveTab('account')}
+            >
+              <ShieldCheck size={18} />
+              <span>Akun Super-Admin</span>
+            </button>
+          )}
 
           <button
             className={`sidebar-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
@@ -1055,10 +1103,10 @@ export default function App() {
 
         <div className="sidebar-bottom-profile">
           <div className="profile-mini-avatar">
-            {(currentUser?.name || currentUser?.username || 'R').charAt(0).toUpperCase()}
+            {(currentUser?.name || currentUser?.username || 'G').charAt(0).toUpperCase()}
           </div>
           <div className="profile-mini-info">
-            <div className="profile-mini-name">{currentUser?.name || currentUser?.username || 'rick'}</div>
+            <div className="profile-mini-name">{currentUser?.name || currentUser?.username || 'Guru SMAN 18'}</div>
             <div className="profile-mini-role">{currentUser?.role || (currentUser?.isSuperAdmin ? 'Super-Admin' : 'Guru Pengawas')}</div>
           </div>
           <button className="sidebar-logout-btn" onClick={handleLogout} title="Keluar">
@@ -1082,7 +1130,7 @@ export default function App() {
                 />
               </div>
               <div className="mobile-profile-info">
-                <div className="mobile-profile-name">{currentUser?.name || currentUser?.username || 'rick'}</div>
+                <div className="mobile-profile-name">{currentUser?.name || currentUser?.username || 'Guru SMAN 18'}</div>
                 <div className="mobile-profile-role">{currentUser?.role || (currentUser?.isSuperAdmin ? 'Super-Admin' : 'Guru Pengawas')}</div>
               </div>
             </div>
@@ -1110,17 +1158,32 @@ export default function App() {
             {!isMobile && (
               <div className="topbar-menu-wrapper desktop-only-menu">
                 <Menu
-                  aria-label="Menu Aksi Super-Admin"
+                  aria-label="Menu Aksi"
                   items={adminMenuItems}
                 />
               </div>
             )}
 
-            {/* Avatar Pill (Desktop Only - Pada Mobile sudah ada di samping petir) */}
+            {/* Avatar Pill (Desktop Only - Menampilkan akun yang login secara dinamis) */}
             {!isMobile && (
               <div className="admin-avatar-pill">
-                <div className="profile-mini-avatar">R</div>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>rick</span>
+                <div className="profile-mini-avatar">
+                  {(currentUser?.name || currentUser?.username || 'G').charAt(0).toUpperCase()}
+                </div>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    maxWidth: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-block',
+                  }}
+                  title={currentUser?.name || currentUser?.username || 'Guru SMAN 18'}
+                >
+                  {currentUser?.name || currentUser?.username || 'Guru SMAN 18'}
+                </span>
               </div>
             )}
           </div>
@@ -1634,7 +1697,7 @@ export default function App() {
                   </p>
                 </div>
                 <div className="workspace-header-actions">
-                  {viewAsRole === 'superadmin' ? (
+                  {currentUser?.isSuperAdmin ? (
                     <Button
                       variant="filled"
                       tint="#0284C7"
@@ -1652,27 +1715,29 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ROLE PRIVACY SHIELD & SUPER-ADMIN BANNER */}
-              <Panel isGlass={liquidGlassEnabled} className="privacy-guard-card super-hebat-mode">
-                <div className="privacy-guard-left">
-                  <div className="privacy-shield-icon super-hebat-glow">
-                    <Zap size={24} color="#0284C7" />
-                  </div>
-                  <div>
-                    <div className="privacy-guard-title">
-                      <span style={{ fontSize: 16, fontWeight: 800, color: '#38BDF8' }}>
-                        KAMU HEBAT
-                      </span>
-                      <span className="privacy-guard-badge badge-super">
-                        🌟 Super-Admin Root
-                      </span>
+              {/* ROLE PRIVACY SHIELD & SUPER-ADMIN BANNER (Hanya tampil untuk Super-Admin Rick) */}
+              {currentUser?.isSuperAdmin && (
+                <div className="standard-panel privacy-guard-card super-hebat-mode" style={{ marginBottom: 16 }}>
+                  <div className="privacy-guard-left">
+                    <div className="privacy-shield-icon super-hebat-glow">
+                      <Zap size={24} color="#0284C7" />
                     </div>
-                    <p className="privacy-guard-desc">
-                      Akses <strong>Super-Admin (rick)</strong> aktif! Seluruh kontrol pengawasan CBT, bypass kiosk, dan wewenang akun dewan guru berada dalam kendali penuhmu.
-                    </p>
+                    <div>
+                      <div className="privacy-guard-title">
+                        <span style={{ fontSize: 16, fontWeight: 800, color: '#38BDF8' }}>
+                          MODE SUPER-ADMIN
+                        </span>
+                        <span className="privacy-guard-badge badge-super">
+                          🌟 Master Root
+                        </span>
+                      </div>
+                      <p className="privacy-guard-desc">
+                        Akses <strong>Super-Admin ({currentUser?.username || 'rick'})</strong> aktif. Hak kendali penuh CBT & konfigurasi Google Spreadsheet.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </Panel>
+              )}
 
               {/* Notification Toast Alert */}
               {teacherNotification && (
@@ -1690,8 +1755,8 @@ export default function App() {
                 </div>
               )}
 
-              {/* Filter & Search Bar */}
-              <Panel isGlass={liquidGlassEnabled} className="search-filter-panel">
+              {/* Filter & Search Bar (Fast Standard Container - Zero Lag) */}
+              <div className="standard-panel search-filter-panel">
                 <SearchField
                   value={userSearch}
                   onValueChange={setUserSearch}
@@ -1740,7 +1805,7 @@ export default function App() {
                     <ShieldCheck size={13} />
                     <span>Admin ({teacherRoleCounts.admin})</span>
                   </button>
-                  {viewAsRole === 'superadmin' && (
+                  {currentUser?.isSuperAdmin && (
                     <button
                       className={`role-filter-chip ${userRoleFilter === 'dev' ? 'active' : ''}`}
                       onClick={() => setUserRoleFilter('dev')}
@@ -1750,10 +1815,10 @@ export default function App() {
                     </button>
                   )}
                 </div>
-              </Panel>
+              </div>
 
-              {/* Teacher & Staff Table */}
-              <Panel isGlass={liquidGlassEnabled} className="user-table-wrapper">
+              {/* Teacher & Staff Table (Hardware-Accelerated Table - Smooth 60fps) */}
+              <div className="standard-panel user-table-wrapper">
                 <table className="user-data-table">
                   <thead>
                     <tr>
@@ -1886,7 +1951,7 @@ export default function App() {
                                 >
                                   Detail
                                 </button>
-                                {viewAsRole === 'superadmin' && !isDev && (
+                                {currentUser?.isSuperAdmin && !isDev && (
                                   <>
                                     <button
                                       className="table-action-btn"
@@ -1912,7 +1977,7 @@ export default function App() {
                     )}
                   </tbody>
                 </table>
-              </Panel>
+              </div>
             </div>
           )}
 
@@ -2398,7 +2463,7 @@ export default function App() {
             </div>
 
             <div className="modal-footer">
-              {viewAsRole === 'superadmin' && !selectedTeacherForDetail.isSuperAdmin && (
+              {currentUser?.isSuperAdmin && !selectedTeacherForDetail.isSuperAdmin && (
                 <>
                   <button
                     className="ui-action-btn"

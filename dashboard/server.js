@@ -358,7 +358,8 @@ async function requestHandler(req, res) {
 
   // 0. Server Health & Realtime Communication Status Check
   if (pathname === '/api/health' && req.method === 'GET') {
-    await syncGoogleTeachers();
+    // Non-blocking trigger so health check returns in <15ms
+    syncGoogleTeachers().catch(() => {});
     return sendJson(res, 200, {
       status: 'online',
       message: 'Server Realtime Terhubung & Siap Berkomunikasi',

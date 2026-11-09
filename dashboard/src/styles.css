@@ -374,6 +374,16 @@ body {
   100% { transform: scale(0.9); opacity: 0.8; }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-icon {
+  animation: spin 0.85s linear infinite;
+  display: inline-block;
+}
+
 .clock-val {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -1311,6 +1321,8 @@ body {
   border-radius: 20px;
   overflow-x: auto;
   padding: 8px;
+  contain: content;
+  will-change: scroll-position;
 }
 
 .user-data-table {
