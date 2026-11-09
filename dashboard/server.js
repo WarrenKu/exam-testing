@@ -274,85 +274,94 @@ async function requestHandler(req, res) {
 
   // 3. Telemetry Ingest from Android APK
   if (pathname === '/api/telemetry' && req.method === 'POST') {
-    const data = await parseBody(req);
-    const deviceId = data.deviceId || 'DEV-' + crypto.createHash('md5').update(data.name + data.deviceLabel).digest('hex').substring(0, 8);
+    try {
+      const data = await parseBody(req);
+      const nameStr = String((data && data.name) || 'Siswa Ujian');
+      const labelStr = String((data && data.deviceLabel) || 'Android Device');
+      const seed = nameStr + labelStr + Date.now();
+      const deviceId = (data && data.deviceId && String(data.deviceId).trim())
+        || ('DEV-' + crypto.createHash('md5').update(seed).digest('hex').substring(0, 8));
 
-    const now = Date.now();
-    const existing = students.get(deviceId) || {
-      deviceId,
-      name: data.name || 'Siswa Ujian',
-      className: data.className || 'X.1',
-      subject: data.subject || 'Ujian Sekolah',
-      deviceLabel: data.deviceLabel || 'Android Device',
-      startTime: now,
-      violationLogs: [],
-    };
+      const now = Date.now();
+      const existing = students.get(deviceId) || {
+        deviceId,
+        name: nameStr,
+        className: String((data && data.className) || 'XI MIPA'),
+        subject: String((data && data.subject) || 'Ujian Sekolah'),
+        deviceLabel: labelStr,
+        startTime: now,
+        violationLogs: [],
+      };
 
-    const prevStatus = existing.status;
-    const newStatus = data.status || 'mengerjakan';
+      const prevStatus = existing.status;
+      const newStatus = data.status || 'mengerjakan';
 
-    // Record violation event if status changed to keluar or terkunci
-    if (newStatus !== prevStatus) {
-      if (newStatus === 'keluar') {
-        existing.violationLogs.push({
-          timestamp: now,
-          text: `Keluar aplikasi / membuka notifikasi (Pelanggaran ${data.leaveCount || 1}/3)`
-        });
-      } else if (newStatus === 'terkunci') {
-        existing.violationLogs.push({
-          timestamp: now,
-          text: `Sesi terkunci! Melanggar batas keluar aplikasi 3x`
-        });
-      } else if (newStatus === 'selesai') {
-        existing.violationLogs.push({
-          timestamp: now,
-          text: `Menyelesaikan ujian`
-        });
+      // Record violation event if status changed to keluar or terkunci
+      if (newStatus !== prevStatus) {
+        if (newStatus === 'keluar') {
+          existing.violationLogs.push({
+            timestamp: now,
+            text: `Keluar aplikasi / membuka notifikasi (Pelanggaran ${data.leaveCount || 1}/3)`
+          });
+        } else if (newStatus === 'terkunci') {
+          existing.violationLogs.push({
+            timestamp: now,
+            text: `Sesi terkunci! Melanggar batas keluar aplikasi 3x`
+          });
+        } else if (newStatus === 'selesai') {
+          existing.violationLogs.push({
+            timestamp: now,
+            text: `Menyelesaikan ujian`
+          });
+        }
       }
+
+      // Update state
+      existing.name = data.name || existing.name;
+      existing.className = data.className || existing.className;
+      existing.subject = data.subject || existing.subject;
+      existing.deviceLabel = data.deviceLabel || existing.deviceLabel;
+      existing.status = newStatus;
+      existing.leaveCount = data.leaveCount !== undefined ? data.leaveCount : existing.leaveCount || 0;
+      existing.batteryLevel = data.batteryLevel !== undefined ? data.batteryLevel : 85;
+      existing.isCharging = data.isCharging || false;
+      existing.temperature = data.temperature || 36.0;
+      existing.network = data.network || 'Wi-Fi';
+      existing.pingMs = data.pingMs || Math.floor(Math.random() * 12 + 6);
+      existing.lastSeen = now;
+
+      // Check if remote unlock was issued for this student
+      let shouldUnlock = false;
+      if (existing.unlockRequested) {
+        shouldUnlock = true;
+        existing.unlockRequested = false;
+        existing.status = 'mengerjakan';
+        existing.leaveCount = 0;
+      }
+
+      students.set(deviceId, existing);
+
+      // Broadcast updated student to dashboard
+      broadcast({ type: 'STUDENT_UPDATE', student: existing });
+
+      // Determine pending broadcast for this student (targeted has higher priority than mass)
+      let pendingBroadcast = null;
+      const targeted = studentBroadcasts.get(deviceId);
+      if (targeted && targeted.expiresAt > now) {
+        pendingBroadcast = targeted;
+      } else if (activeBroadcast && activeBroadcast.expiresAt > now) {
+        pendingBroadcast = activeBroadcast;
+      }
+
+      return sendJson(res, 200, {
+        success: true,
+        shouldUnlock,
+        broadcast: pendingBroadcast,
+      });
+    } catch (err) {
+      console.error('Error handling /api/telemetry:', err);
+      return sendJson(res, 500, { error: 'Internal Server Error' });
     }
-
-    // Update state
-    existing.name = data.name || existing.name;
-    existing.className = data.className || existing.className;
-    existing.subject = data.subject || existing.subject;
-    existing.deviceLabel = data.deviceLabel || existing.deviceLabel;
-    existing.status = newStatus;
-    existing.leaveCount = data.leaveCount !== undefined ? data.leaveCount : existing.leaveCount || 0;
-    existing.batteryLevel = data.batteryLevel !== undefined ? data.batteryLevel : 85;
-    existing.isCharging = data.isCharging || false;
-    existing.temperature = data.temperature || 36.0;
-    existing.network = data.network || 'Wi-Fi';
-    existing.pingMs = data.pingMs || Math.floor(Math.random() * 12 + 6);
-    existing.lastSeen = now;
-
-    // Check if remote unlock was issued for this student
-    let shouldUnlock = false;
-    if (existing.unlockRequested) {
-      shouldUnlock = true;
-      existing.unlockRequested = false;
-      existing.status = 'mengerjakan';
-      existing.leaveCount = 0;
-    }
-
-    students.set(deviceId, existing);
-
-    // Broadcast updated student to dashboard
-    broadcast({ type: 'STUDENT_UPDATE', student: existing });
-
-    // Determine pending broadcast for this student (targeted has higher priority than mass)
-    let pendingBroadcast = null;
-    const targeted = studentBroadcasts.get(deviceId);
-    if (targeted && targeted.expiresAt > now) {
-      pendingBroadcast = targeted;
-    } else if (activeBroadcast && activeBroadcast.expiresAt > now) {
-      pendingBroadcast = activeBroadcast;
-    }
-
-    return sendJson(res, 200, {
-      success: true,
-      shouldUnlock,
-      broadcast: pendingBroadcast,
-    });
   }
 
   // 4. Get active students list
