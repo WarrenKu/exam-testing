@@ -942,13 +942,15 @@ export default function App() {
               />
             </div>
 
-            {/* Kelvin Zhang Glisse Menu Component (Desktop) */}
-            <div className="topbar-menu-wrapper desktop-only-menu">
-              <Menu
-                aria-label="Menu Aksi Super-Admin"
-                items={adminMenuItems}
-              />
-            </div>
+            {/* Kelvin Zhang Glisse Menu Component (Desktop Only - Dipindahkan ke companion bar di mobile sesuai panah biru) */}
+            {!isMobile && (
+              <div className="topbar-menu-wrapper desktop-only-menu">
+                <Menu
+                  aria-label="Menu Aksi Super-Admin"
+                  items={adminMenuItems}
+                />
+              </div>
+            )}
 
             <div className="admin-avatar-pill">
               <div className="profile-mini-avatar">R</div>
@@ -1829,59 +1831,50 @@ export default function App() {
       </div>
 
       {/* ===================================================================== */}
-      {/* MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU                           */}
+      {/* MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU (Sesuai Gambar 2)         */}
       {/* ===================================================================== */}
       {isMobile && (
         <div className="mobile-bottom-nav-container">
-          <div className="mobile-nav-pill-wrapper">
-            {liquidGlassEnabled ? (
-              <TabBar
-                aria-label="Navigasi Android"
-                value={activeTab}
-                onValueChange={(val) => val && setActiveTab(val)}
-                items={[
-                  { value: 'dashboard', label: 'Home', icon: <LayoutDashboard size={20} /> },
-                  { value: 'monitoring', label: 'Monitoring', icon: <Monitor size={20} /> },
-                  { value: 'status', label: 'Status API', icon: <Activity size={20} /> },
-                  { value: 'account', label: 'Akun', icon: <ShieldCheck size={20} /> },
-                ]}
-              />
-            ) : (
-              <div className="standard-bottom-nav-bar">
-                <button
-                  className={`std-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('dashboard')}
-                >
-                  <LayoutDashboard size={18} />
-                  <span>Home</span>
-                </button>
-                <button
-                  className={`std-nav-btn ${activeTab === 'monitoring' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('monitoring')}
-                >
-                  <Monitor size={18} />
-                  <span>Monitoring</span>
-                </button>
-                <button
-                  className={`std-nav-btn ${activeTab === 'status' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('status')}
-                >
-                  <Activity size={18} />
-                  <span>Status API</span>
-                </button>
-                <button
-                  className={`std-nav-btn ${activeTab === 'account' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('account')}
-                >
-                  <ShieldCheck size={18} />
-                  <span>Akun</span>
-                </button>
-              </div>
-            )}
+          <div className="mobile-nav-capsule">
+            <button
+              type="button"
+              className={`capsule-tab-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <LayoutDashboard size={20} className="tab-icon" />
+              <span className="tab-label">Home</span>
+            </button>
+
+            <button
+              type="button"
+              className={`capsule-tab-item ${activeTab === 'monitoring' ? 'active' : ''}`}
+              onClick={() => setActiveTab('monitoring')}
+            >
+              <Monitor size={20} className="tab-icon" />
+              <span className="tab-label">Monitoring</span>
+            </button>
+
+            <button
+              type="button"
+              className={`capsule-tab-item ${activeTab === 'status' ? 'active' : ''}`}
+              onClick={() => setActiveTab('status')}
+            >
+              <Activity size={20} className="tab-icon" />
+              <span className="tab-label">Status API</span>
+            </button>
+
+            <button
+              type="button"
+              className={`capsule-tab-item ${activeTab === 'users' || activeTab === 'account' ? 'active' : ''}`}
+              onClick={() => setActiveTab('users')}
+            >
+              <ShieldCheck size={20} className="tab-icon" />
+              <span className="tab-label">Akun</span>
+            </button>
           </div>
 
-          {/* Tombol Menu Aksi (Dipindahkan ke samping navbar sesuai screenshot) */}
-          <div className="mobile-menu-action-wrapper">
+          {/* Tombol Companion Aksi Bulat di Samping Kapsul (Persis Gambar 2) */}
+          <div className="mobile-companion-action">
             <Menu
               aria-label="Menu Opsi Aksi"
               align="end"

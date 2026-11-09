@@ -1574,118 +1574,160 @@ body {
 }
 
 /* ==========================================================================
-   MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU COMPANION
+   MOBILE (ANDROID) BOTTOM NAVBAR - MATCHING IMAGE 2 EXACTLY
    ========================================================================== */
 .mobile-bottom-nav-container {
   position: fixed;
-  bottom: 16px;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 999;
+  z-index: 9999;
   width: calc(100% - 24px);
-  max-width: 480px;
+  max-width: 440px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
 }
 
-.mobile-nav-pill-wrapper {
+/* Capsule Nav Bar (Left Main Pill) */
+.mobile-nav-capsule {
   flex: 1;
-  display: flex;
-  justify-content: center;
   min-width: 0;
+  height: 58px;
+  border-radius: 9999px;
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  box-sizing: border-box;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
-.mobile-nav-pill-wrapper > * {
-  width: 100%;
+.liquid-mode .mobile-nav-capsule {
+  background: rgba(22, 22, 26, 0.88);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.mobile-menu-action-wrapper {
+/* Tab Item (Evenly distributed across the capsule, flex: 1) */
+.capsule-tab-item {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  border-radius: 9999px;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.capsule-tab-item .tab-icon {
+  color: #A1A1AA;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.capsule-tab-item .tab-label {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: #F0EFEA;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: all 0.2s ease;
+}
+
+/* Active State (Full smooth capsule pill matching "Keypad" in Image 2) */
+.capsule-tab-item.active {
+  background: #2b2b30;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.liquid-mode .capsule-tab-item.active {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.capsule-tab-item.active .tab-icon {
+  color: #38BDF8;
+  transform: scale(1.05);
+}
+
+.capsule-tab-item.active .tab-label {
+  color: #38BDF8;
+  font-weight: 700;
+}
+
+/* Companion Action Circle Button (Matching Image 2 Circle) */
+.mobile-companion-action {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   position: relative;
 }
 
-/* Style the Menu trigger button at bottom right (companion to navbar) */
-.mobile-menu-action-wrapper .lg-menu {
+.mobile-companion-action .lg-menu {
   position: relative;
   display: inline-flex;
 }
 
-.mobile-menu-action-wrapper .lg-menu > button {
-  width: 48px;
-  height: 48px;
+.mobile-companion-action .lg-menu > button {
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  background: var(--lg-glass, rgba(41, 41, 41, 0.65));
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  border: 1px solid var(--lg-edge, rgba(240, 239, 234, 0.18));
-  color: var(--text-bone);
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #F0EFEA;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-menu-action-wrapper .lg-menu > button:hover {
-  background: rgba(60, 60, 60, 0.85);
-  border-color: rgba(240, 239, 234, 0.35);
+.liquid-mode .mobile-companion-action .lg-menu > button {
+  background: rgba(22, 22, 26, 0.88);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.standard-mode .mobile-menu-action-wrapper .lg-menu > button {
-  background: #1c1c1f;
-  border: 1px solid var(--surface-graphite);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+.mobile-companion-action .lg-menu > button:hover,
+.mobile-companion-action .lg-menu > button:active {
+  background: #2b2b30;
+  color: #38BDF8;
+  transform: scale(0.96);
 }
 
-/* Ensure popover expands UPWARDS above the bottom nav */
-.mobile-menu-action-wrapper .lg-menu-card {
+/* Menu Card Popover position (opens UPWARDS) */
+.mobile-companion-action .lg-menu-card {
   top: auto !important;
-  bottom: 56px !important;
+  bottom: 68px !important;
   right: 0 !important;
   transform-origin: calc(100% - 24px) 100% !important;
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.7) !important;
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.8) !important;
   border: 1px solid rgba(240, 239, 234, 0.18) !important;
-}
-
-.standard-bottom-nav-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 24px;
-  background-color: #1a1a1c;
-  border: 1px solid var(--surface-graphite);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
-}
-
-.std-nav-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: transparent;
-  border: none;
-  color: var(--text-concrete);
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 12px;
-  transition: all 0.2s;
-}
-
-.std-nav-btn.active {
-  color: var(--text-bone);
-  background: rgba(41, 41, 41, 0.8);
+  border-radius: 20px !important;
+  background: rgba(20, 20, 24, 0.95) !important;
+  backdrop-filter: blur(24px) !important;
 }
 
 /* ==========================================================================
