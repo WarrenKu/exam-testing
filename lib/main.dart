@@ -1844,7 +1844,23 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   int _leaveCount = 0;
   bool _locked = false;
   bool _isLoadingWeb = true;
+  bool _canGoBack = false;
+  bool _canGoForward = false;
   String? _webError;
+
+  Future<void> _checkNavigationHistory() async {
+    if (!mounted) return;
+    try {
+      final canBack = await _webController.canGoBack();
+      final canForward = await _webController.canGoForward();
+      if (mounted && (canBack != _canGoBack || canForward != _canGoForward)) {
+        setState(() {
+          _canGoBack = canBack;
+          _canGoForward = canForward;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -1870,11 +1886,16 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                 _isLoadingWeb = true;
                 _webError = null;
               });
+              _checkNavigationHistory();
             }
           },
           onPageFinished: (_) {
             if (mounted) setState(() => _isLoadingWeb = false);
             _webController.runJavaScript(_identityListener);
+            _checkNavigationHistory();
+          },
+          onUrlChange: (_) {
+            _checkNavigationHistory();
           },
           onWebResourceError: (error) {
             if (mounted) {
@@ -1938,6 +1959,10 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   void _readIdentity(JavaScriptMessage message) {
     try {
       final data = jsonDecode(message.message) as Map<String, dynamic>;
+      if (data['key'] == 'navChange') {
+        _checkNavigationHistory();
+        return;
+      }
       final value = (data['value'] as String? ?? '').trim();
       if (value.isEmpty) return;
       setState(() {
@@ -2091,52 +2116,71 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: Colors.white),
-                              tooltip: 'Kembali',
-                              padding: const EdgeInsets.all(8),
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                              onPressed: () async {
-                                if (await _webController.canGoBack()) {
-                                  await _webController.goBack();
-                                }
-                              },
-                            ),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: () {
-                                setState(() => _isLoadingWeb = true);
-                                _webController.reload();
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.refresh_rounded, size: 17, color: Colors.white),
-                                    SizedBox(width: 6),
-                                    Text(
-                                      'Refresh',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.3,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              icon: Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 18,
+                                color: _canGoBack
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.28),
                               ),
+                              tooltip: _canGoBack ? 'Halaman sebelumnya' : null,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              constraints: const BoxConstraints(minWidth: 48, minHeight: 40),
+                              onPressed: _canGoBack
+                                  ? () async {
+                                      await _webController.runJavaScript(
+                                          'window.__ujianKitaSave && window.__ujianKitaSave();');
+                                      await _webController.goBack();
+                                      await _checkNavigationHistory();
+                                    }
+                                  : null,
+                            ),
+                            Container(
+                              height: 18,
+                              width: 1,
+                              color: Colors.white.withValues(alpha: 0.18),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.white),
-                              tooltip: 'Maju',
-                              padding: const EdgeInsets.all(8),
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              icon: const Icon(
+                                Icons.refresh_rounded,
+                                size: 21,
+                                color: Colors.white,
+                              ),
+                              tooltip: 'Muat ulang',
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              constraints: const BoxConstraints(minWidth: 48, minHeight: 40),
                               onPressed: () async {
-                                if (await _webController.canGoForward()) {
-                                  await _webController.goForward();
-                                }
+                                await _webController.runJavaScript(
+                                    'window.__ujianKitaSave && window.__ujianKitaSave();');
+                                setState(() => _isLoadingWeb = true);
+                                await _webController.reload();
+                                await _checkNavigationHistory();
                               },
+                            ),
+                            Container(
+                              height: 18,
+                              width: 1,
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 18,
+                                color: _canGoForward
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.28),
+                              ),
+                              tooltip: _canGoForward ? 'Halaman berikutnya' : null,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              constraints: const BoxConstraints(minWidth: 48, minHeight: 40),
+                              onPressed: _canGoForward
+                                  ? () async {
+                                      await _webController.runJavaScript(
+                                          'window.__ujianKitaSave && window.__ujianKitaSave();');
+                                      await _webController.goForward();
+                                      await _checkNavigationHistory();
+                                    }
+                                  : null,
                             ),
                           ],
                         ),
@@ -2189,6 +2233,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
 const _identityListener = r'''
 (() => {
   if (window.__ujianKitaIdentityReady) {
+    if (typeof window.__ujianKitaRestore === 'function') window.__ujianKitaRestore();
     if (typeof window.__ujianKitaScan === 'function') window.__ujianKitaScan();
     return;
   }
@@ -2224,6 +2269,162 @@ const _identityListener = r'''
       if (window.UjianKita && window.UjianKita.postMessage) {
         window.UjianKita.postMessage(JSON.stringify({ key, value: cleanVal }));
       }
+    } catch (_) {}
+  };
+
+  const notifyNav = () => {
+    try {
+      if (window.UjianKita && window.UjianKita.postMessage) {
+        window.UjianKita.postMessage(JSON.stringify({ key: 'navChange' }));
+      }
+    } catch (_) {}
+  };
+
+  const getStorageKey = () => '__ujianKitaDraft_' + (window.location.pathname || 'form');
+
+  const saveFormData = () => {
+    try {
+      const data = {};
+      const questions = document.querySelectorAll('[role="listitem"], .Qr7Oae, .geS5n, .m7WMo');
+      questions.forEach((q, idx) => {
+        const headingEl = q.querySelector('[role="heading"], .M7eMe, .HoXoMd, .z12JJ');
+        const heading = headingEl ? (headingEl.innerText || headingEl.textContent || '').trim() : ('q_' + idx);
+        if (!heading) return;
+
+        // 1. Input teks & textarea
+        const txt = q.querySelector('input[type="text"], input:not([type]), textarea');
+        if (txt && txt.value && txt.value.trim().length > 0) {
+          data[heading] = { type: 'text', value: txt.value };
+        }
+
+        // 2. Radio pilihan ganda
+        const checkedRadio = q.querySelector('[role="radio"][aria-checked="true"]');
+        if (checkedRadio) {
+          const val = checkedRadio.getAttribute('data-value') ||
+                      checkedRadio.getAttribute('data-answer-value') ||
+                      checkedRadio.getAttribute('aria-label') ||
+                      checkedRadio.innerText;
+          if (val && val.trim().length > 0) {
+            data[heading] = { type: 'radio', value: val.trim() };
+          }
+        }
+
+        // 3. Checkbox kotak centang
+        const checkedBoxes = q.querySelectorAll('[role="checkbox"][aria-checked="true"]');
+        if (checkedBoxes.length > 0) {
+          const vals = [];
+          checkedBoxes.forEach((b) => {
+            const v = b.getAttribute('data-answer-value') ||
+                      b.getAttribute('data-value') ||
+                      b.getAttribute('aria-label') ||
+                      b.innerText;
+            if (v && v.trim().length > 0) vals.push(v.trim());
+          });
+          if (vals.length > 0) {
+            data[heading] = { type: 'checkbox', value: vals };
+          }
+        }
+
+        // 4. Dropdown pilihan
+        const selectedOption = q.querySelector('[role="option"][aria-selected="true"], [role="option"].isSelected');
+        if (selectedOption) {
+          const val = selectedOption.getAttribute('data-value') || selectedOption.innerText;
+          if (val && val.trim().length > 0 && !val.toLowerCase().startsWith('pilih') && !val.toLowerCase().startsWith('choose')) {
+            data[heading] = { type: 'dropdown', value: val.trim() };
+          }
+        }
+        const dropdownEl = q.querySelector('.vRMGwf.oJeWuf, .vRMGwf, [jsname="L9xktb"]');
+        if (dropdownEl && dropdownEl.innerText) {
+          const val = dropdownEl.innerText.trim();
+          if (val && !val.toLowerCase().startsWith('pilih') && !val.toLowerCase().startsWith('choose')) {
+            data[heading] = { type: 'dropdown', value: val };
+          }
+        }
+      });
+
+      const sKey = getStorageKey();
+      let existing = {};
+      try {
+        existing = JSON.parse(localStorage.getItem(sKey) || '{}');
+      } catch (_) {}
+      const merged = Object.assign(existing, data);
+      localStorage.setItem(sKey, JSON.stringify(merged));
+    } catch (_) {}
+  };
+
+  const restoreFormData = () => {
+    try {
+      const sKey = getStorageKey();
+      const savedStr = localStorage.getItem(sKey);
+      if (!savedStr) return;
+      const data = JSON.parse(savedStr);
+
+      const questions = document.querySelectorAll('[role="listitem"], .Qr7Oae, .geS5n, .m7WMo');
+      questions.forEach((q, idx) => {
+        const headingEl = q.querySelector('[role="heading"], .M7eMe, .HoXoMd, .z12JJ');
+        const heading = headingEl ? (headingEl.innerText || headingEl.textContent || '').trim() : ('q_' + idx);
+        const item = data[heading];
+        if (!item) return;
+
+        // Restore Text
+        if (item.type === 'text') {
+          const txt = q.querySelector('input[type="text"], input:not([type]), textarea');
+          if (txt && (!txt.value || txt.value.trim().length === 0)) {
+            txt.value = item.value;
+            txt.dispatchEvent(new Event('input', { bubbles: true }));
+            txt.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+
+        // Restore Radio
+        if (item.type === 'radio') {
+          const currentChecked = q.querySelector('[role="radio"][aria-checked="true"]');
+          if (!currentChecked) {
+            const radios = q.querySelectorAll('[role="radio"]');
+            for (let i = 0; i < radios.length; i++) {
+              const r = radios[i];
+              const val = r.getAttribute('data-value') ||
+                          r.getAttribute('data-answer-value') ||
+                          r.getAttribute('aria-label') ||
+                          r.innerText;
+              if (val && val.trim() === item.value) {
+                r.click();
+                break;
+              }
+            }
+          }
+        }
+
+        // Restore Checkbox
+        if (item.type === 'checkbox' && Array.isArray(item.value)) {
+          const boxes = q.querySelectorAll('[role="checkbox"]');
+          boxes.forEach((b) => {
+            const val = b.getAttribute('data-answer-value') ||
+                        b.getAttribute('data-value') ||
+                        b.getAttribute('aria-label') ||
+                        b.innerText;
+            if (val && item.value.includes(val.trim()) && b.getAttribute('aria-checked') !== 'true') {
+              b.click();
+            }
+          });
+        }
+
+        // Restore Dropdown
+        if (item.type === 'dropdown') {
+          const currentText = q.querySelector('.vRMGwf.oJeWuf, .vRMGwf, [jsname="L9xktb"]');
+          if (!currentText || currentText.innerText.toLowerCase().startsWith('pilih')) {
+            const options = q.querySelectorAll('[role="option"]');
+            for (let i = 0; i < options.length; i++) {
+              const opt = options[i];
+              const val = opt.getAttribute('data-value') || opt.innerText;
+              if (val && val.trim() === item.value) {
+                opt.click();
+                break;
+              }
+            }
+          }
+        }
+      });
     } catch (_) {}
   };
 
@@ -2294,24 +2495,59 @@ const _identityListener = r'''
     } catch (_) {}
   };
 
+  window.__ujianKitaSave = saveFormData;
+  window.__ujianKitaRestore = restoreFormData;
   window.__ujianKitaScan = scan;
 
+  window.addEventListener('popstate', () => {
+    notifyNav();
+    setTimeout(restoreFormData, 250);
+  });
+  window.addEventListener('hashchange', () => {
+    notifyNav();
+    setTimeout(restoreFormData, 250);
+  });
+
   // Listeners untuk menangkap ketikan, klik pilihan radio / checkbox, maupun perubahan dropdown
-  document.addEventListener('input', scan, true);
-  document.addEventListener('change', scan, true);
+  document.addEventListener('input', () => {
+    saveFormData();
+    scan();
+  }, true);
+  document.addEventListener('change', () => {
+    saveFormData();
+    scan();
+  }, true);
   document.addEventListener('click', () => {
-    setTimeout(scan, 80);
-    setTimeout(scan, 300);
-    setTimeout(scan, 800);
+    setTimeout(saveFormData, 100);
+    setTimeout(scan, 120);
+    setTimeout(saveFormData, 350);
+    setTimeout(scan, 400);
+    setTimeout(notifyNav, 450);
+    setTimeout(notifyNav, 1200);
   }, true);
 
-  // Interval otomatis setiap 1.5 detik agar selalu sinkron
-  setInterval(scan, 1500);
+  // Interval otomatis agar selalu sinkron dan tersimpan
+  setInterval(() => {
+    saveFormData();
+    scan();
+  }, 1500);
 
-  // Jalankan segera saat halaman selesai dimuat
-  setTimeout(scan, 300);
-  setTimeout(scan, 1000);
-  setTimeout(scan, 2500);
+  // Jalankan segera saat halaman selesai dimuat: pulihkan data & pindai identitas
+  setTimeout(() => {
+    restoreFormData();
+    scan();
+    notifyNav();
+  }, 300);
+  setTimeout(() => {
+    restoreFormData();
+    scan();
+    notifyNav();
+  }, 900);
+  setTimeout(() => {
+    restoreFormData();
+    scan();
+    notifyNav();
+  }, 2000);
 })();
 ''';
 
