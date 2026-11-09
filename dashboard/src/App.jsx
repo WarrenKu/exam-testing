@@ -926,8 +926,8 @@ export default function App() {
                 <Zap size={18} color="#10B981" />
               </div>
               <div className="mobile-profile-info">
-                <div className="mobile-profile-name">{user?.username || 'rick'}</div>
-                <div className="mobile-profile-role">{user?.role || 'Super-Admin'}</div>
+                <div className="mobile-profile-name">rick</div>
+                <div className="mobile-profile-role">Super-Admin</div>
               </div>
             </div>
 
@@ -964,7 +964,7 @@ export default function App() {
             {!isMobile && (
               <div className="admin-avatar-pill">
                 <div className="profile-mini-avatar">R</div>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{user?.username || 'rick'}</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>rick</span>
               </div>
             )}
           </div>
