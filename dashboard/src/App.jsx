@@ -143,9 +143,9 @@ export default function App() {
     name: '',
     nip: '',
     nsid: '',
-    role: 'Guru Pengawas',
+    role: 'Guru Mata Pelajaran',
     subject: '',
-    room: 'Ruang 01',
+    classes: '',
     status: 'Aktif',
   });
 
@@ -583,9 +583,9 @@ export default function App() {
           name: '',
           nip: '',
           nsid: '',
-          role: 'Guru Pengawas',
+          role: 'Guru Mata Pelajaran',
           subject: '',
-          room: 'Ruang 01',
+          classes: '',
           status: 'Aktif',
         });
         setTeacherNotification(`Akun guru baru "${data.teacher.name}" (NSID: ${data.teacher.nsid || data.teacher.id}) berhasil ditambahkan ke sistem!`);
@@ -616,9 +616,9 @@ export default function App() {
         const matchNip = (t.nip || '').toLowerCase().includes(q);
         const matchId = (t.id || '').toLowerCase().includes(q);
         const matchSubject = (t.subject || '').toLowerCase().includes(q);
-        const matchRoom = (t.room || '').toLowerCase().includes(q);
+        const matchClasses = (t.classes || '').toLowerCase().includes(q);
         const matchRole = (t.role || '').toLowerCase().includes(q);
-        return matchName || matchNip || matchId || matchSubject || matchRoom || matchRole;
+        return matchName || matchNip || matchId || matchSubject || matchClasses || matchRole;
       }
 
       return true;
@@ -642,18 +642,23 @@ export default function App() {
   }, [teachers, viewAsRole]);
 
   // Shared Admin Menu Items (Used in Desktop topbar and Mobile bottom navbar)
-  const adminMenuItems = useMemo(
-    () => [
+  const adminMenuItems = useMemo(() => {
+    const isSuper = viewAsRole === 'superadmin';
+    const items = [
+      { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
       { label: 'Siaran Pengumuman Massal', icon: <Radio size={15} />, onSelect: () => setShowBroadcastAllModal(true) },
       { label: 'Refresh Data SSE', icon: <RefreshCw size={15} />, onSelect: connectSSE },
-      { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
       { label: 'Ekspor Data CSV', icon: <Download size={15} />, onSelect: handleExportCSV },
-      { label: 'Pengaturan', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
-      'separator',
-      { label: 'Bersihkan Sesi / Demo', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true },
-    ],
-    [students]
-  );
+    ];
+    if (isSuper) {
+      items.push(
+        { label: 'Pengaturan Sistem', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
+        'separator',
+        { label: 'Bersihkan Sesi / Demo', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true }
+      );
+    }
+    return items;
+  }, [students, viewAsRole]);
 
   // Metrics Count
   const counts = useMemo(() => {
@@ -1374,14 +1379,21 @@ export default function App() {
                   </p>
                 </div>
                 <div className="workspace-header-actions">
-                  <Button
-                    variant="filled"
-                    tint="#10B981"
-                    icon={<UserPlus size={16} />}
-                    onClick={() => setShowAddTeacherModal(true)}
-                  >
-                    + Tambah Akun Guru
-                  </Button>
+                  {viewAsRole === 'superadmin' ? (
+                    <Button
+                      variant="filled"
+                      tint="#10B981"
+                      icon={<UserPlus size={16} />}
+                      onClick={() => setShowAddTeacherModal(true)}
+                    >
+                      + Tambah Akun Guru
+                    </Button>
+                  ) : (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: 13, fontWeight: 600 }}>
+                      <ShieldCheck size={16} />
+                      <span>Hak Akses Guru: Monitoring & Buka Kunci Siswa</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1499,8 +1511,8 @@ export default function App() {
                       <th>User ID & NSID</th>
                       <th>Nama Pengguna / Guru</th>
                       <th>Role / Peran</th>
-                      <th>Mata Pelajaran / Tugas</th>
-                      <th>Ruang Penugasan</th>
+                      <th>Mata Pelajaran & Kelas Diampu</th>
+                      <th>Otoritas & Hak Akses</th>
                       <th>Status Akun</th>
                       <th>Terakhir Login</th>
                       <th>Aksi</th>
@@ -1570,17 +1582,22 @@ export default function App() {
                               </span>
                             </td>
 
-                            {/* Mapel / Tugas */}
+                            {/* Mapel & Kelas Diampu */}
                             <td>
-                              <div style={{ fontWeight: 600 }}>{t.subject || '-'}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-concrete)' }}>
-                                {t.privilege || 'Hak Akses Standar'}
+                              <div style={{ fontWeight: 700, color: 'var(--text-bone)' }}>{t.subject || 'Mata Pelajaran Umum'}</div>
+                              <div style={{ fontSize: 11, color: '#38BDF8', marginTop: 2, fontWeight: 600 }}>
+                                Kelas: {t.classes || 'Semua Kelas'}
                               </div>
                             </td>
 
-                            {/* Ruang Tugas */}
+                            {/* Otoritas & Hak Akses */}
                             <td>
-                              <span className="class-pill">{t.room || 'Ruang 01'}</span>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: isDev ? '#34d399' : '#10B981' }}>
+                                {isDev ? 'Akses Penuh Arsitektur Root' : 'Monitoring Siswa & Buka Kunci'}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-concrete)' }}>
+                                {isDev ? 'Developer Options' : 'Dapat membuka kunci layar siswa'}
+                              </div>
                             </td>
 
                             {/* Status Akun (Interactive Toggle) */}
@@ -1588,8 +1605,8 @@ export default function App() {
                               <button
                                 className={`status-toggle-pill ${t.status === 'Aktif' ? 'active' : 'inactive'}`}
                                 onClick={() => handleToggleTeacherStatus(t.id)}
-                                title={isDev ? 'Status Super-Admin tidak dapat diubah' : 'Klik untuk mengubah status'}
-                                disabled={isDev}
+                                title={viewAsRole !== 'superadmin' ? 'Hanya Super-Admin yang dapat mengubah status' : (isDev ? 'Status Super-Admin tidak dapat diubah' : 'Klik untuk mengubah status')}
+                                disabled={isDev || viewAsRole !== 'superadmin'}
                               >
                                 <span className="status-dot"></span>
                                 <span>{t.status}</span>
@@ -1611,23 +1628,23 @@ export default function App() {
                                 >
                                   Detail
                                 </button>
-                                {!isDev && (
-                                  <button
-                                    className="table-action-btn"
-                                    onClick={() => handleResetTeacherPassword(t)}
-                                    title="Reset password ke sandi sementara"
-                                  >
-                                    Reset PIN
-                                  </button>
-                                )}
-                                {!isDev && (
-                                  <button
-                                    className="table-action-btn danger"
-                                    onClick={() => handleDeleteTeacher(t.id, t.name)}
-                                    title="Hapus akun guru"
-                                  >
-                                    Hapus
-                                  </button>
+                                {viewAsRole === 'superadmin' && !isDev && (
+                                  <>
+                                    <button
+                                      className="table-action-btn"
+                                      onClick={() => handleResetTeacherPassword(t)}
+                                      title="Reset password ke sandi sementara"
+                                    >
+                                      Reset PIN
+                                    </button>
+                                    <button
+                                      className="table-action-btn danger"
+                                      onClick={() => handleDeleteTeacher(t.id, t.name)}
+                                      title="Hapus akun guru"
+                                    >
+                                      Hapus
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -2079,10 +2096,10 @@ export default function App() {
               <Panel isGlass={liquidGlassEnabled} className="quad-cell">
                 <div className="quad-label">
                   <Monitor size={16} />
-                  <span>Ruang Penugasan</span>
+                  <span>Kelas yang Diampu</span>
                 </div>
-                <div className="quad-value" style={{ fontSize: 15 }}>{selectedTeacherForDetail.room}</div>
-                <div className="quad-desc">Lokasi Pengawasan CBT</div>
+                <div className="quad-value" style={{ fontSize: 15 }}>{selectedTeacherForDetail.classes || 'XI.1 - XI.4'}</div>
+                <div className="quad-desc">Rombel Penugasan Ujian</div>
               </Panel>
 
               <Panel isGlass={liquidGlassEnabled} className="quad-cell">
@@ -2110,7 +2127,7 @@ export default function App() {
               </div>
               <div className="info-stat-row">
                 <span>Hak Otoritas & Akses</span>
-                <strong>{selectedTeacherForDetail.privilege || 'Presensi & Pengawasan Standar'}</strong>
+                <strong style={{ color: '#10B981' }}>{selectedTeacherForDetail.privilege || 'Monitoring Siswa & Buka Kunci Layar'}</strong>
               </div>
               <div className="info-stat-row">
                 <span>Terakhir Login</span>
@@ -2123,7 +2140,7 @@ export default function App() {
             </div>
 
             <div className="modal-footer">
-              {!selectedTeacherForDetail.isSuperAdmin && (
+              {viewAsRole === 'superadmin' && !selectedTeacherForDetail.isSuperAdmin && (
                 <>
                   <button
                     className="ui-action-btn"
@@ -2201,44 +2218,48 @@ export default function App() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Peran / Role</label>
+                <label className="form-label">Peran / Role Petugas</label>
                 <select
                   className="form-select-input"
                   value={newTeacher.role}
                   onChange={(e) => setNewTeacher((prev) => ({ ...prev, role: e.target.value }))}
                 >
-                  <option value="Guru Pengawas">👨‍🏫 Guru Pengawas</option>
-                  <option value="Proktor Utama">🛡️ Proktor Utama</option>
-                  <option value="Proktor Cadangan">🛡️ Proktor Cadangan</option>
-                  <option value="Admin Kurikulum">📋 Admin Kurikulum</option>
+                  <option value="Guru Mata Pelajaran">👨‍🏫 Guru Mata Pelajaran (Default)</option>
+                  <option value="Guru Pengawas">📋 Guru Pengawas Ruang</option>
+                  <option value="Proktor CBT">🛡️ Proktor CBT</option>
+                  <option value="Admin Kurikulum">📊 Admin Kurikulum</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Mata Pelajaran Diampu</label>
+                <label className="form-label">Mata Pelajaran yang Diampu</label>
                 <Input
                   value={newTeacher.subject}
                   onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, subject: val }))}
-                  placeholder="Contoh: Matematika Peminatan (Kelas XI)"
+                  placeholder="Contoh: MATEMATIKA atau FISIKA & KIMIA"
+                  required
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Ruang Penugasan Ujian</label>
-                <select
-                  className="form-select-input"
-                  value={newTeacher.room}
-                  onChange={(e) => setNewTeacher((prev) => ({ ...prev, room: e.target.value }))}
-                >
-                  <option value="Ruang Ujian 01">Ruang Ujian 01</option>
-                  <option value="Ruang Ujian 02">Ruang Ujian 02</option>
-                  <option value="Ruang Ujian 03">Ruang Ujian 03</option>
-                  <option value="Ruang Ujian 04">Ruang Ujian 04</option>
-                  <option value="Ruang Ujian 05">Ruang Ujian 05</option>
-                  <option value="Lab Komputer 1">Lab Komputer 1</option>
-                  <option value="Lab Multimedia">Lab Multimedia</option>
-                  <option value="Ruang Kurikulum">Ruang Kurikulum</option>
-                </select>
+                <label className="form-label">Kelas / Rombel yang Diampu</label>
+                <Input
+                  value={newTeacher.classes || ''}
+                  onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, classes: val }))}
+                  placeholder="Contoh: XI.1 - XI.4 (atau Semua Kelas X)"
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-concrete)', marginTop: 4 }}>
+                  💡 Ruang ujian bersifat dinamis & berganti setiap sesi. Identitas penugasan difokuskan pada Mata Pelajaran dan Kelas yang diampu guru.
+                </div>
+              </div>
+
+              <div className="form-group" style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '10px 14px', borderRadius: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 2 }}>
+                  🛡️ Hak Akses Otoritas Guru:
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-concrete)', lineHeight: 1.4 }}>
+                  Guru memiliki otoritas penuh untuk memantau pengerjaan ujian siswa realtime, melihat data sesama guru, dan <strong>membuka kunci layar ujian siswa (remote unlock)</strong> saat siswa melanggar batas keluar.
+                </div>
               </div>
 
               <div className="modal-footer" style={{ marginTop: 10 }}>
