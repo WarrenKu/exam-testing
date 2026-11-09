@@ -1689,7 +1689,7 @@ body {
 }
 
 /* ==========================================================================
-   LOGIN SCREEN
+   LOGIN SCREEN (FREE AMBIENT BACKGROUND & MODERN GLASS)
    ========================================================================== */
 .login-screen {
   min-height: 100vh;
@@ -1697,16 +1697,77 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  position: relative;
+  overflow: hidden;
+  background-color: #060608;
+  background-image:
+    radial-gradient(circle at 50% 12%, rgba(16, 185, 129, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 88% 80%, rgba(2, 132, 199, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 12% 85%, rgba(16, 185, 129, 0.09) 0%, transparent 40%),
+    radial-gradient(rgba(240, 239, 234, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+}
+
+.login-ambient-glow {
+  position: absolute;
+  width: 680px;
+  height: 680px;
+  border-radius: 50%;
+  filter: blur(140px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.45;
+  top: -180px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, rgba(2, 132, 199, 0.25) 50%, transparent 75%);
 }
 
 .login-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 420px;
-  padding: 36px 32px;
+  padding: 38px 32px;
   border-radius: 28px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 20px;
+  background: rgba(18, 18, 20, 0.82) !important;
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  border: 1px solid rgba(240, 239, 234, 0.12) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(16, 185, 129, 0.08) !important;
+}
+
+.login-logo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.login-logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(2, 132, 199, 0.18));
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 8px 28px rgba(16, 185, 129, 0.3);
+}
+
+.login-logo-text {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--text-bone);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .login-head {

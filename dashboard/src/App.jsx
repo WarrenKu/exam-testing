@@ -739,14 +739,38 @@ export default function App() {
   if (!token) {
     return (
       <div className="login-screen">
+        <div className="login-ambient-glow"></div>
         <Panel isGlass={liquidGlassEnabled} className="login-card">
           <div className="login-head">
-            <div className="login-badge">
+            {/* Logo Emblem UjianKita */}
+            <div className="login-logo-wrapper">
+              <div className="login-logo-badge">
+                <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
+                  <rect width="48" height="48" rx="14" fill="url(#login-logo-grad)" />
+                  <path d="M24 10L12 18V28C12 34.6 17.1 40.8 24 42.4C30.9 40.8 36 34.6 36 28V18L24 10Z" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="rgba(255,255,255,0.12)"/>
+                  <path d="M25 18L18 27H24L23 34L30 25H24L25 18Z" fill="#F0EFEA" stroke="#F0EFEA" strokeWidth="1" strokeLinejoin="round"/>
+                  <defs>
+                    <linearGradient id="login-logo-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#10B981"/>
+                      <stop offset="1" stopColor="#0284C7"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div className="login-logo-text">
+                <span>UjianKita</span>
+                <span style={{ color: 'var(--text-concrete)', fontWeight: 400 }}>·</span>
+                <span style={{ fontSize: 13, color: '#10B981' }}>CBT System</span>
+              </div>
+            </div>
+
+            <div className="login-badge" style={{ marginTop: 4 }}>
               <span className="pulse-dot"></span>
               <span>SMAN 18 BATAM</span>
             </div>
-            <h1>Super-Admin Monitor</h1>
-            <p>UjianKita Realtime Integrity Control Panel</p>
+
+            <h1 style={{ marginTop: 8 }}>Login Portal</h1>
+            <p>Portal Pemantauan & Otoritas Sesi Ujian CBT</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
@@ -755,7 +779,7 @@ export default function App() {
               <Input
                 value={loginUser}
                 onValueChange={setLoginUser}
-                placeholder="Masukkan username"
+                placeholder="Masukkan username petugas"
                 icon={<User size={16} />}
               />
             </div>
@@ -779,13 +803,13 @@ export default function App() {
               type="submit"
               style={{ width: '100%', height: 44, marginTop: 8 }}
             >
-              Masuk Dashboard Super-Admin
+              Masuk ke Portal
             </Button>
           </form>
 
           <div className="login-foot">
             <ShieldCheck size={14} color="#10B981" />
-            <span>Kredensial Super-Admin: <strong>rick</strong> / <strong>rick</strong></span>
+            <span>Kredensial Petugas: <strong>rick</strong> / <strong>rick</strong></span>
           </div>
         </Panel>
       </div>
