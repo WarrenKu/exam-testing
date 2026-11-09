@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Menu, TabBar, Switch, Button, Glass, Input, SearchField, SegmentedControl } from 'glisse';
+import logoSman18 from './assets/logo-sman18.png';
 import {
   LayoutDashboard,
   Monitor,
@@ -128,12 +129,26 @@ export default function App() {
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ujiankita_user') || 'null');
+    } catch (e) {
+      return null;
+    }
+  });
 
   // Teachers & Staff Users State (User ID)
   const [teachers, setTeachers] = useState([]);
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [userSearch, setUserSearch] = useState('');
-  const [viewAsRole, setViewAsRole] = useState('superadmin'); // 'superadmin' vs 'regular'
+  const [viewAsRole, setViewAsRole] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('ujiankita_user') || 'null');
+      return (u && u.isSuperAdmin) ? 'superadmin' : 'regular';
+    } catch (e) {
+      return 'superadmin';
+    }
+  }); // 'superadmin' vs 'regular'
   const [selectedTeacherForDetail, setSelectedTeacherForDetail] = useState(null);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [teacherNotification, setTeacherNotification] = useState('');
@@ -355,9 +370,14 @@ export default function App() {
       const data = await res.json();
       if (res.ok && data.success && data.token) {
         localStorage.setItem('ujiankita_superadmin_token', data.token);
+        if (data.user) {
+          localStorage.setItem('ujiankita_user', JSON.stringify(data.user));
+          setCurrentUser(data.user);
+          setViewAsRole(data.user.isSuperAdmin ? 'superadmin' : 'regular');
+        }
         setToken(data.token);
       } else {
-        setLoginError(data.message || 'Username atau password salah.');
+        setLoginError(data.message || 'Kode Guru atau password salah.');
       }
     } catch (err) {
       setLoginError('Gagal terhubung ke server backend.');
@@ -366,7 +386,9 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('ujiankita_superadmin_token');
+    localStorage.removeItem('ujiankita_user');
     setToken('');
+    setCurrentUser(null);
     setStudents([]);
     setSelectedStudentId(null);
   };
@@ -802,20 +824,14 @@ export default function App() {
         {liquidGlassEnabled && <div className="login-ambient-glow"></div>}
         <Panel isGlass={liquidGlassEnabled} className="login-card">
           <div className="login-head">
-            {/* Logo Emblem UjianKita */}
+            {/* Logo Resmi SMAN 18 Batam (Clean Transparent Background) */}
             <div className="login-logo-wrapper">
               <div className="login-logo-badge">
-                <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
-                  <rect width="48" height="48" rx="14" fill="url(#login-logo-grad)" />
-                  <path d="M24 10L12 18V28C12 34.6 17.1 40.8 24 42.4C30.9 40.8 36 34.6 36 28V18L24 10Z" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="rgba(255,255,255,0.12)"/>
-                  <path d="M25 18L18 27H24L23 34L30 25H24L25 18Z" fill="#F0EFEA" stroke="#F0EFEA" strokeWidth="1" strokeLinejoin="round"/>
-                  <defs>
-                    <linearGradient id="login-logo-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#10B981"/>
-                      <stop offset="1" stopColor="#0284C7"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <img
+                  src={logoSman18}
+                  alt="SMAN 18 Batam"
+                  className="login-school-logo"
+                />
               </div>
               <div className="login-logo-text">
                 <span>UjianKita</span>
@@ -884,12 +900,18 @@ export default function App() {
       {/* DESKTOP SIDEBAR (Left) */}
       <aside className="admin-desktop-sidebar">
         <div className="sidebar-brand-box">
-          <div className="brand-logo-icon">
-            <Zap size={20} color="#10B981" />
+          <div className="brand-logo-icon" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+            <img
+              src={logoSman18}
+              alt="SMAN 18 Batam"
+              style={{ width: 32, height: 32, objectFit: 'contain' }}
+            />
           </div>
           <div>
             <div className="sidebar-brand-title">UjianKita</div>
-            <div className="sidebar-brand-sub">Super-Admin Monitor</div>
+            <div className="sidebar-brand-sub">
+              {currentUser?.isSuperAdmin ? 'Super-Admin Monitor' : (currentUser?.subject || 'Monitoring Pengawas')}
+            </div>
           </div>
         </div>
 
@@ -964,10 +986,12 @@ export default function App() {
         </nav>
 
         <div className="sidebar-bottom-profile">
-          <div className="profile-mini-avatar">R</div>
+          <div className="profile-mini-avatar">
+            {(currentUser?.name || currentUser?.username || 'R').charAt(0).toUpperCase()}
+          </div>
           <div className="profile-mini-info">
-            <div className="profile-mini-name">rick</div>
-            <div className="profile-mini-role">Super-Admin</div>
+            <div className="profile-mini-name">{currentUser?.name || currentUser?.username || 'rick'}</div>
+            <div className="profile-mini-role">{currentUser?.role || (currentUser?.isSuperAdmin ? 'Super-Admin' : 'Guru Pengawas')}</div>
           </div>
           <button className="sidebar-logout-btn" onClick={handleLogout} title="Keluar">
             <LogOut size={16} />
@@ -980,14 +1004,18 @@ export default function App() {
         {/* Top Header */}
         <header className="admin-topbar">
           <div className="topbar-left">
-            {/* Mobile Branding: Petir Logo Badge + Nama (disamping) & Role (dibawahnya) */}
+            {/* Mobile Branding: Logo SMAN 18 Batam + Nama & Role */}
             <div className="mobile-header-brand">
-              <div className="mobile-brand-lightning">
-                <Zap size={18} color="#10B981" />
+              <div className="mobile-brand-lightning" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+                <img
+                  src={logoSman18}
+                  alt="SMAN 18 Batam"
+                  style={{ width: 32, height: 32, objectFit: 'contain' }}
+                />
               </div>
               <div className="mobile-profile-info">
-                <div className="mobile-profile-name">rick</div>
-                <div className="mobile-profile-role">Super-Admin</div>
+                <div className="mobile-profile-name">{currentUser?.name || currentUser?.username || 'rick'}</div>
+                <div className="mobile-profile-role">{currentUser?.role || (currentUser?.isSuperAdmin ? 'Super-Admin' : 'Guru Pengawas')}</div>
               </div>
             </div>
 

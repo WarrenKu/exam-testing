@@ -5,6 +5,7 @@
  */
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -16,126 +17,190 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const ADMIN_USER = 'rick';
 const ADMIN_PASS = 'rick';
 
+// Google Spreadsheet Integration (Option 2)
+// Student app & teachers data sheet
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0';
+const GOOGLE_SHEET_TAB = process.env.GOOGLE_SHEET_TAB || 'Data_Guru';
+const GOOGLE_SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(GOOGLE_SHEET_TAB)}`;
+
+// Load default 38 SMAN 18 Batam teachers from data/teachers.json
+let defaultTeachers = [];
+try {
+  const teachersPath = path.join(__dirname, 'data', 'teachers.json');
+  if (fs.existsSync(teachersPath)) {
+    defaultTeachers = JSON.parse(fs.readFileSync(teachersPath, 'utf8'));
+  }
+} catch (e) {
+  console.warn('Could not read default teachers.json:', e.message);
+}
+
 // Staff / Teachers & Pengawas Registry
-// Privacy Rule: Super-admin account (isSuperAdmin: true) is Developer-only
-// and MUST NEVER be exposed to regular roles (Guru, Pengawas, etc.)
-let staffUsers = [
-  {
-    id: 'DEV-001',
-    nsid: 'NSID-DEV-0001',
-    username: 'rick',
-    name: 'Rick Sanchez (Developer Root)',
-    nip: 'DEV-ROOT-001',
-    role: 'Super-Admin (Developer)',
-    subject: 'System Architecture & Dev Options',
-    classes: 'Semua Sistem & Root',
-    status: 'Aktif',
-    privilege: 'Akses Penuh Root & Bypass Kiosk',
-    lastLogin: 'Baru saja',
-    isSuperAdmin: true,
-  },
-  {
-    id: 'GRU-301',
-    nsid: 'NSID-202611-0081',
-    username: 'jensun.ornisin',
-    name: 'Pkt. Jensun Ornisin, S.Pd',
-    nip: '19840712 200801 1 005',
-    role: 'Guru Mata Pelajaran',
-    subject: 'MATEMATIKA',
-    classes: 'XI.1 - XI.4',
-    status: 'Aktif',
-    privilege: 'Monitoring Siswa & Buka Kunci Layar Siswa',
-    lastLogin: '5 menit lalu',
-    isSuperAdmin: false,
-  },
-  {
-    id: 'GRU-302',
-    nsid: 'NSID-202611-0112',
-    username: 'budi.santoso',
-    name: 'Budi Santoso, S.Pd',
-    nip: '19821105 200801 1 012',
-    role: 'Guru Mata Pelajaran',
-    subject: 'FISIKA & KIMIA',
-    classes: 'X.1 - X.4',
-    status: 'Aktif',
-    privilege: 'Monitoring Siswa & Buka Kunci Layar Siswa',
-    lastLogin: '25 menit lalu',
-    isSuperAdmin: false,
-  },
-  {
-    id: 'GRU-303',
-    nsid: 'NSID-202611-0198',
-    username: 'dewi.lestari',
-    name: 'Dewi Lestari, M.Si',
-    nip: '19880719 201101 2 009',
-    role: 'Guru Mata Pelajaran',
-    subject: 'BIOLOGI IPA',
-    classes: 'XII MIPA 1-3',
-    status: 'Aktif',
-    privilege: 'Monitoring Siswa & Buka Kunci Layar Siswa',
-    lastLogin: '45 menit lalu',
-    isSuperAdmin: false,
-  },
-  {
-    id: 'GRU-304',
-    nsid: 'NSID-202611-0245',
-    username: 'ahmad.fauzi',
-    name: 'Ahmad Fauzi, S.Pd',
-    nip: '19910412 201502 1 003',
-    role: 'Guru Mata Pelajaran',
-    subject: 'BAHASA INDONESIA',
-    classes: 'X.1 - X.6',
-    status: 'Aktif',
-    privilege: 'Monitoring Siswa & Buka Kunci Layar Siswa',
-    lastLogin: 'Hari ini, 07:15',
-    isSuperAdmin: false,
-  },
-  {
-    id: 'PRK-201',
-    nsid: 'NSID-202611-0301',
-    username: 'siti.nurhaliza',
-    name: 'Siti Nurhaliza, S.Kom',
-    nip: '19850320 200902 2 004',
-    role: 'Proktor CBT',
-    subject: 'Teknis Server & Komputer CBT',
-    classes: 'Lab Komputer 1 & 2',
-    status: 'Aktif',
-    privilege: 'Sinkronisasi Token, Monitoring & Buka Kunci',
-    lastLogin: '3 menit lalu',
-    isSuperAdmin: false,
-  },
-  {
-    id: 'ADM-101',
-    nsid: 'NSID-202611-0402',
-    username: 'hendra.gunawan',
-    name: 'Drs. Hendra Gunawan, M.Pd',
-    nip: '19790514 200501 1 008',
-    role: 'Admin Kurikulum',
-    subject: 'Koordinator Bank Soal & Jadwal',
-    classes: 'Semua Rombel (X, XI, XII)',
-    status: 'Aktif',
-    privilege: 'Kelola Jadwal, Token, & Akses Guru',
-    lastLogin: '10 menit lalu',
-    isSuperAdmin: false,
-  },
-  {
-    id: 'GRU-305',
-    nsid: 'NSID-202611-0520',
-    username: 'hartono.pai',
-    name: 'Drs. H. Hartono, M.Ag',
-    nip: '19750208 200212 1 002',
-    role: 'Guru Mata Pelajaran',
-    subject: 'PAI & BUDI PEKERTI',
-    classes: 'XII.1 - XII.4',
-    status: 'Aktif',
-    privilege: 'Monitoring Siswa & Buka Kunci Layar Siswa',
-    lastLogin: 'Hari ini, 07:30',
-    isSuperAdmin: false,
-  },
-];
+const SUPER_ADMIN_USER = {
+  id: 'DEV-001',
+  nsid: 'NSID-DEV-0001',
+  code: 'ROOT',
+  username: 'rick',
+  name: 'Rick Sanchez (Developer Root)',
+  nip: 'DEV-ROOT-001',
+  role: 'Super-Admin (Developer)',
+  subject: 'System Architecture & Dev Options',
+  classes: 'Semua Sistem & Root',
+  status: 'Aktif',
+  privilege: 'Akses Penuh Root & Bypass Kiosk',
+  lastLogin: 'Baru saja',
+  isSuperAdmin: true,
+};
+
+let staffUsers = [SUPER_ADMIN_USER, ...defaultTeachers];
+
+// Google Sheets Sync Status & Cache
+let googleSyncStatus = {
+  connected: false,
+  lastSync: null,
+  teacherCount: defaultTeachers.length,
+  source: 'teachers.json (Pre-loaded 38 Guru SMAN 18 Batam)',
+  sheetTab: GOOGLE_SHEET_TAB,
+};
+let lastGoogleFetch = 0;
+const GOOGLE_CACHE_TTL_MS = 25000;
+
+function fetchUrlWithRedirects(url, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) return reject(new Error('Too many redirects'));
+    https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        let redirectUrl = res.headers.location;
+        if (!redirectUrl.startsWith('http')) {
+          const u = new URL(url);
+          redirectUrl = u.origin + redirectUrl;
+        }
+        return resolve(fetchUrlWithRedirects(redirectUrl, maxRedirects - 1));
+      }
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, body }));
+    }).on('error', reject);
+  });
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const parseRow = (line) => {
+    const cells = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        cells.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    cells.push(cur.trim());
+    return cells;
+  };
+
+  const header = parseRow(lines[0]).map((h) => h.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const cells = parseRow(lines[i]);
+    const obj = {};
+    header.forEach((h, idx) => {
+      obj[h] = cells[idx] || '';
+    });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+async function syncGoogleTeachers(force = false) {
+  const now = Date.now();
+  if (!force && lastGoogleFetch && (now - lastGoogleFetch < GOOGLE_CACHE_TTL_MS)) {
+    return;
+  }
+  lastGoogleFetch = now;
+  try {
+    const res = await fetchUrlWithRedirects(GOOGLE_SHEET_CSV_URL);
+    if (res.status === 200 && res.body && res.body.includes(',')) {
+      const rows = parseCsv(res.body);
+      if (rows.length > 0) {
+        for (const row of rows) {
+          const code = String(row.KODEGURU || row.KODE || row.KODEMAPEL || row.USERNAME || '').trim().toUpperCase();
+          const name = String(row.NAMAGURU || row.NAMA || row.NAME || '').trim();
+          const subject = String(row.MATAPELAJARAN || row.MAPEL || row.SUBJECT || '').trim();
+          const password = String(row.PASSWORD || row.PASS || 'admin').trim();
+          const role = String(row.ROLE || 'Guru Mata Pelajaran').trim();
+          const status = String(row.STATUS || 'Aktif').trim();
+
+          if (!code && !name) continue;
+
+          const existing = staffUsers.find((u) => {
+            if (u.isSuperAdmin) return false;
+            const matchCode = u.code && u.code.toUpperCase() === code;
+            const matchName = u.name && u.name.toLowerCase() === name.toLowerCase();
+            return matchCode || matchName;
+          });
+
+          if (existing) {
+            if (name) existing.name = name;
+            if (subject) existing.subject = subject;
+            if (password) existing.password = password;
+            if (role) existing.role = role;
+            if (status) existing.status = status;
+          } else if (code) {
+            staffUsers.push({
+              id: 'GRU-' + String(staffUsers.length + 1).padStart(3, '0'),
+              nsid: 'NSID-202611-' + String(staffUsers.length + 1).padStart(4, '0'),
+              code,
+              username: code.toLowerCase(),
+              password: password || 'admin',
+              name: name || `Guru (${code})`,
+              nip: '-',
+              role: role || 'Guru Mata Pelajaran',
+              subject: subject || 'Mata Pelajaran Umum',
+              classes: 'Semua Rombel',
+              status: status || 'Aktif',
+              privilege: 'Monitoring Siswa & Buka Kunci Layar Siswa',
+              lastLogin: 'Belum pernah',
+              isSuperAdmin: false,
+            });
+          }
+        }
+        googleSyncStatus = {
+          connected: true,
+          lastSync: now,
+          teacherCount: staffUsers.filter((u) => !u.isSuperAdmin).length,
+          source: `Google Spreadsheet (Tab: ${GOOGLE_SHEET_TAB})`,
+          sheetTab: GOOGLE_SHEET_TAB,
+        };
+        return;
+      }
+    }
+  } catch (err) {
+    // Graceful fallback without throwing
+  }
+  googleSyncStatus = {
+    connected: false,
+    lastSync: now,
+    teacherCount: staffUsers.filter((u) => !u.isSuperAdmin).length,
+    source: 'teachers.json (Pre-loaded 38 Guru SMAN 18 Batam)',
+    sheetTab: GOOGLE_SHEET_TAB,
+  };
+}
 
 // In-memory active tokens & student state
-const activeTokens = new Set();
+const activeTokens = new Map(); // token -> user details
 const students = new Map(); // key: deviceId, value: StudentData
 const sseClients = new Set(); // SSE connected response streams
 
@@ -248,28 +313,84 @@ async function requestHandler(req, res) {
       studentsCount: students.size,
       connectedClients: sseClients.size,
       activeBroadcast: Boolean(activeBroadcast),
+      googleSync: googleSyncStatus,
       uptimeSeconds: Math.floor(process.uptime()),
     });
   }
 
-  // 1. Login
+  // 1. Login (Super-Admin or Guru via Kode Guru / Google Sheet)
   if (pathname === '/api/login' && req.method === 'POST') {
     const { username, password } = await parseBody(req);
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
+    const cleanUser = String(username || '').trim();
+    const cleanPass = String(password || '').trim();
+
+    // Trigger non-blocking/cached sync from Google Sheets
+    await syncGoogleTeachers();
+
+    // Check Super-Admin credentials
+    if (cleanUser.toLowerCase() === ADMIN_USER.toLowerCase() && cleanPass === ADMIN_PASS) {
       const token = crypto.randomBytes(24).toString('hex');
-      activeTokens.add(token);
+      const superAdminUser = {
+        username: ADMIN_USER,
+        name: 'Rick Sanchez (Developer Root)',
+        role: 'Super-Admin',
+        isSuperAdmin: true,
+      };
+      activeTokens.set(token, superAdminUser);
       return sendJson(res, 200, {
         success: true,
         token,
-        user: { username: ADMIN_USER, role: 'Super-Admin' }
+        user: superAdminUser
       });
     }
-    return sendJson(res, 401, { success: false, message: 'Username atau password salah!' });
+
+    // Check Teacher / Staff accounts (matching Kode Guru, username, or name)
+    const teacher = staffUsers.find((u) => {
+      if (u.isSuperAdmin) return false;
+      const uCode = String(u.code || '').trim().toLowerCase();
+      const uUsername = String(u.username || '').trim().toLowerCase();
+      const uName = String(u.name || '').trim().toLowerCase();
+      const target = cleanUser.toLowerCase();
+      return uCode === target || uUsername === target || uName === target;
+    });
+
+    if (teacher) {
+      const expectedPass = String(teacher.password || 'admin').trim();
+      if (cleanPass === expectedPass) {
+        if (teacher.status === 'Nonaktif') {
+          return sendJson(res, 403, { success: false, message: 'Akun guru ini sedang dinonaktifkan oleh administrator.' });
+        }
+
+        const token = crypto.randomBytes(24).toString('hex');
+        const teacherUser = {
+          id: teacher.id,
+          code: teacher.code,
+          username: teacher.code || teacher.username,
+          name: teacher.name,
+          role: teacher.role || 'Guru Mata Pelajaran',
+          subject: teacher.subject,
+          isSuperAdmin: false,
+        };
+        activeTokens.set(token, teacherUser);
+        teacher.lastLogin = 'Baru saja';
+
+        return sendJson(res, 200, {
+          success: true,
+          token,
+          user: teacherUser
+        });
+      }
+    }
+
+    return sendJson(res, 401, { success: false, message: 'Kode Guru atau Password salah!' });
   }
 
   // 2. Auth Check
   if (pathname === '/api/auth/check' && req.method === 'GET') {
-    return sendJson(res, 200, { authenticated: checkAuth(req) });
+    const auth = req.headers['authorization'] || '';
+    const token = auth.replace(/^Bearer\s+/i, '').trim();
+    const user = activeTokens.get(token) || null;
+    return sendJson(res, 200, { authenticated: Boolean(user), user });
   }
 
   // 3. Telemetry Ingest from Android APK
@@ -480,12 +601,14 @@ async function requestHandler(req, res) {
   // PRIVACY RULE: If viewRole is regular/guru/proktor/admin, Super-Admin dev account is HIDDEN!
   if (pathname === '/api/teachers' && req.method === 'GET') {
     if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    await syncGoogleTeachers();
     const viewRole = urlObj.searchParams.get('viewRole') || req.headers['x-view-role'] || 'superadmin';
     const isSuperAdminView = viewRole === 'superadmin';
     const list = isSuperAdminView ? staffUsers : staffUsers.filter(u => !u.isSuperAdmin);
     return sendJson(res, 200, {
       success: true,
       viewRole,
+      googleSync: googleSyncStatus,
       superAdminHidden: !isSuperAdminView,
       teachers: list,
     });
