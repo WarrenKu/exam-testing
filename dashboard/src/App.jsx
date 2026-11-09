@@ -174,6 +174,22 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Modal active indicator
+  const isAnyModalOpen = Boolean(
+    showBroadcastAllModal ||
+    selectedStudentId ||
+    showAddTeacherModal ||
+    selectedTeacherForDetail
+  );
+
+  // Otomatis tutup semua popup/modal saat tab navigasi berganti (Home ke Status API, dll)
+  useEffect(() => {
+    setShowBroadcastAllModal(false);
+    setSelectedStudentId(null);
+    setSelectedTeacherForDetail(null);
+    setShowAddTeacherModal(false);
+  }, [activeTab]);
+
   // Persist Liquid Glasses preference (Default OFF)
   useEffect(() => {
     localStorage.setItem('ujiankita_liquid_glasses', liquidGlassEnabled ? 'true' : 'false');
@@ -1909,7 +1925,7 @@ export default function App() {
       {/* ===================================================================== */}
       {/* MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU                           */}
       {/* ===================================================================== */}
-      {isMobile && (
+      {isMobile && !isAnyModalOpen && (
         <div className="mobile-bottom-nav-container">
           {liquidGlassEnabled ? (
             /* MODE LIQUID GLASS: Kelvin Zhang Glisse TabBar Asli (Animasi Tarik & Spring Physics) */

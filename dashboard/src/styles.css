@@ -1888,26 +1888,28 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(8, 8, 8, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  z-index: 1000;
+  background: rgba(8, 8, 8, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 100000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 24px 20px 48px 20px;
+  box-sizing: border-box;
 }
 
 .modal-card {
   width: 100%;
   max-width: 540px;
-  max-height: 90vh;
+  max-height: calc(100vh - 60px);
   overflow-y: auto;
   border-radius: 28px;
-  padding: 28px;
+  padding: 28px 24px 34px 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  box-sizing: border-box;
 }
 
 .modal-header {
@@ -1985,8 +1987,37 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 10px;
+  padding-top: 16px;
+  padding-bottom: 8px;
+  margin-top: 16px;
   border-top: 1px solid var(--surface-graphite);
+}
+
+@media (max-width: 768px) {
+  .modal-backdrop {
+    padding: 16px 12px 36px 12px;
+    align-items: center;
+  }
+  .modal-card {
+    max-height: calc(100vh - 48px);
+    padding: 20px 16px 28px 16px;
+    border-radius: 22px;
+    gap: 16px;
+  }
+  .modal-footer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 14px;
+    padding-bottom: 12px;
+  }
+  .modal-footer button,
+  .modal-footer .lg-button {
+    flex: 1 1 auto;
+    height: 44px;
+  }
 }
 
 /* ==========================================================================
