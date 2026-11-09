@@ -33,6 +33,75 @@ import {
   Info
 } from 'lucide-react';
 
+// =========================================================================
+// ISOLATED STANDALONE COMPONENTS (Defined OUTSIDE App to prevent re-mounts)
+// =========================================================================
+
+// 1. Stable Panel Wrapper (Never causes re-mounts on state changes)
+function Panel({ isGlass, children, className = '', style = {}, onClick }) {
+  if (isGlass) {
+    return (
+      <Glass className={className} style={style} onClick={onClick}>
+        {children}
+      </Glass>
+    );
+  }
+  return (
+    <div className={`standard-panel ${className}`} style={style} onClick={onClick}>
+      {children}
+    </div>
+  );
+}
+
+// 2. Isolated Live Clock (Updates locally, NEVER triggers App re-render)
+function LiveClock() {
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString('id-ID', { hour12: false }) + ' WIB');
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString('id-ID', { hour12: false }) + ' WIB');
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <div className="clock-val">{time}</div>;
+}
+
+// 3. Isolated Server Uptime (Updates locally, NEVER triggers App re-render)
+function ServerUptime() {
+  const [uptime, setUptime] = useState(160);
+  useEffect(() => {
+    const timer = setInterval(() => setUptime((prev) => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const format = (sec) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h > 0 ? h + 'j ' : ''}${m}m ${s}d`;
+  };
+  return <div className="stat-huge">{format(uptime)}</div>;
+}
+
+// 4. Stable One-Click Copy Button
+function CopyButton({ text, label = 'Salin' }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button className="api-copy-btn" onClick={handleCopy} title="Salin ke clipboard">
+      {copied ? <Check size={13} color="#10B981" /> : <Copy size={13} />}
+      <span>{copied ? 'Tersalin!' : label}</span>
+    </button>
+  );
+}
+
+// =========================================================================
+// MAIN APP CONTROLLER
+// =========================================================================
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('ujiankita_superadmin_token') || '');
   const [students, setStudents] = useState([]);
@@ -47,9 +116,7 @@ export default function App() {
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(
     () => localStorage.getItem('ujiankita_sound_alert') === 'true'
   );
-  const [copied, setCopied] = useState(false);
-  const [currentTime, setCurrentTime] = useState('');
-  const [uptimeSeconds, setUptimeSeconds] = useState(148);
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   // Login form state
@@ -75,16 +142,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('ujiankita_sound_alert', soundAlertEnabled ? 'true' : 'false');
   }, [soundAlertEnabled]);
-
-  // Live Clock & Uptime
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB');
-      setUptimeSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // SSE Realtime Connection
   const connectSSE = () => {
@@ -141,11 +198,15 @@ export default function App() {
     };
   }, [token]);
 
-  // Auto Stale Cleanup (>18s without response)
+  // Auto Stale Cleanup (Safely checks before updating state to avoid re-renders)
   useEffect(() => {
     const timer = setInterval(() => {
       const now = Date.now();
-      setStudents((prev) => prev.filter((s) => now - s.lastSeen <= 18000));
+      setStudents((prev) => {
+        const hasStale = prev.some((s) => now - s.lastSeen > 18000);
+        if (!hasStale) return prev;
+        return prev.filter((s) => now - s.lastSeen <= 18000);
+      });
     }, 3000);
     return () => clearInterval(timer);
   }, []);
@@ -271,8 +332,8 @@ export default function App() {
   const copyEndpoint = () => {
     const url = `http://${window.location.host}/api/telemetry`;
     navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedEndpoint(true);
+      setTimeout(() => setCopiedEndpoint(false), 2000);
     });
   };
 
@@ -349,37 +410,13 @@ export default function App() {
     }
   };
 
-  // Format uptime
-  const formatUptime = (sec) => {
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    return `${h > 0 ? h + 'j ' : ''}${m}m ${s}d`;
-  };
-
-  // Dynamic Wrapper Component (Glass vs Standard)
-  const Panel = ({ children, className = '', style = {}, onClick }) => {
-    if (liquidGlassEnabled) {
-      return (
-        <Glass className={className} style={style} onClick={onClick}>
-          {children}
-        </Glass>
-      );
-    }
-    return (
-      <div className={`standard-panel ${className}`} style={style} onClick={onClick}>
-        {children}
-      </div>
-    );
-  };
-
   // =========================================================================
   // VIEW: LOGIN SCREEN (If not authenticated)
   // =========================================================================
   if (!token) {
     return (
       <div className="login-screen">
-        <Panel className="login-card">
+        <Panel isGlass={liquidGlassEnabled} className="login-card">
           <div className="login-head">
             <div className="login-badge">
               <span className="pulse-dot"></span>
@@ -425,7 +462,7 @@ export default function App() {
 
           <div className="login-foot">
             <ShieldCheck size={14} color="#10B981" />
-            <span>Kredensial Super-Admin Resmi: <strong>rick</strong> / <strong>rick</strong></span>
+            <span>Kredensial Super-Admin: <strong>rick</strong> / <strong>rick</strong></span>
           </div>
         </Panel>
       </div>
@@ -544,7 +581,7 @@ export default function App() {
               <span className="pulse-dot"></span>
               <span>LIVE SERVER</span>
             </div>
-            <div className="clock-val">{currentTime}</div>
+            <LiveClock />
           </div>
 
           <div className="topbar-right">
@@ -586,7 +623,7 @@ export default function App() {
           {/* TAB 1: DASHBOARD (HOME)                                             */}
           {/* =================================================================== */}
           {activeTab === 'dashboard' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Dashboard Pengawasan Ujian</h1>
@@ -596,31 +633,31 @@ export default function App() {
 
               {/* Status Metric Grid */}
               <div className="metrics-grid">
-                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('all'); }}>
+                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('all'); }}>
                   <div className="metric-box-title">Total Terhubung</div>
                   <div className="metric-box-val">{counts.total}</div>
                   <div className="metric-box-desc">Peserta Aktif di Server</div>
                 </Panel>
 
-                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('mengerjakan'); }}>
+                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('mengerjakan'); }}>
                   <div className="metric-box-title color-green">🟢 Mengerjakan</div>
                   <div className="metric-box-val color-green">{counts.mengerjakan}</div>
                   <div className="metric-box-desc">Fokus di Layar Soal</div>
                 </Panel>
 
-                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('keluar'); }}>
+                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('keluar'); }}>
                   <div className="metric-box-title color-yellow">🟡 Keluar Aplikasi</div>
                   <div className="metric-box-val color-yellow">{counts.keluar}</div>
                   <div className="metric-box-desc">Peringatan Terdeteksi (1-2x)</div>
                 </Panel>
 
-                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('terkunci'); }}>
+                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('terkunci'); }}>
                   <div className="metric-box-title color-red">🔴 Sesi Terkunci</div>
                   <div className="metric-box-val color-red">{counts.terkunci}</div>
                   <div className="metric-box-desc">Melanggar Batas 3x Keluar</div>
                 </Panel>
 
-                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('selesai'); }}>
+                <Panel isGlass={liquidGlassEnabled} className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('selesai'); }}>
                   <div className="metric-box-title color-blue">🔵 Selesai Ujian</div>
                   <div className="metric-box-val color-blue">{counts.selesai}</div>
                   <div className="metric-box-desc">Telah Kirim Jawaban</div>
@@ -629,7 +666,7 @@ export default function App() {
 
               {/* Quick Info Banners */}
               <div className="dashboard-double-cards">
-                <Panel className="banner-card">
+                <Panel isGlass={liquidGlassEnabled} className="banner-card">
                   <div className="banner-card-head">
                     <Zap size={18} color="#10B981" />
                     <h3>Status Sistem & Pelaksanaan</h3>
@@ -654,7 +691,7 @@ export default function App() {
                   </div>
                 </Panel>
 
-                <Panel className="banner-card">
+                <Panel isGlass={liquidGlassEnabled} className="banner-card">
                   <div className="banner-card-head">
                     <Activity size={18} color="#3B82F6" />
                     <h3>Aksi Cepat Super-Admin</h3>
@@ -688,7 +725,7 @@ export default function App() {
           {/* TAB 2: MONITORING REALTIME                                          */}
           {/* =================================================================== */}
           {activeTab === 'monitoring' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Monitoring Siswa Realtime</h1>
@@ -697,7 +734,7 @@ export default function App() {
               </div>
 
               {/* Filter & Search Bar */}
-              <Panel className="search-filter-panel">
+              <Panel isGlass={liquidGlassEnabled} className="search-filter-panel">
                 <SearchField
                   value={search}
                   onValueChange={setSearch}
@@ -719,7 +756,7 @@ export default function App() {
 
               {/* Student Cards Grid (Clean layout: no activity list clutter) */}
               {filteredStudents.length === 0 ? (
-                <Panel className="empty-box">
+                <Panel isGlass={liquidGlassEnabled} className="empty-box">
                   <div className="empty-icon">
                     <Monitor size={32} />
                   </div>
@@ -740,6 +777,7 @@ export default function App() {
                     return (
                       <Panel
                         key={s.deviceId}
+                        isGlass={liquidGlassEnabled}
                         className="student-card"
                         onClick={() => setSelectedStudentId(s.deviceId)}
                       >
@@ -795,7 +833,7 @@ export default function App() {
           {/* TAB 3: SYSTEM                                                       */}
           {/* =================================================================== */}
           {activeTab === 'system' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Status Server & Lingkungan Sistem</h1>
@@ -804,26 +842,26 @@ export default function App() {
               </div>
 
               <div className="stats-grid">
-                <Panel className="stat-box">
+                <Panel isGlass={liquidGlassEnabled} className="stat-box">
                   <div className="stat-title">Server Runtime</div>
                   <div className="stat-huge">Node.js 22</div>
                   <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Zero external native deps · Standalone Server</div>
                 </Panel>
 
-                <Panel className="stat-box">
+                <Panel isGlass={liquidGlassEnabled} className="stat-box">
                   <div className="stat-title">Uptime Server</div>
-                  <div className="stat-huge">{formatUptime(uptimeSeconds)}</div>
+                  <ServerUptime />
                   <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Aktif tanpa crash / gangguan</div>
                 </Panel>
 
-                <Panel className="stat-box">
+                <Panel isGlass={liquidGlassEnabled} className="stat-box">
                   <div className="stat-title">Pembersihan Otomatis</div>
                   <div className="stat-huge">18s Timeout</div>
                   <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Siswa inaktif otomatis dibersihkan</div>
                 </Panel>
               </div>
 
-              <Panel className="system-detail-panel" style={{ marginTop: 20 }}>
+              <Panel isGlass={liquidGlassEnabled} className="system-detail-panel" style={{ marginTop: 20 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Metrik Soket & Protokol</h3>
                 <div className="banner-card-body">
                   <div className="info-stat-row">
@@ -851,7 +889,7 @@ export default function App() {
           {/* TAB 4: STATUS (API)                                                 */}
           {/* =================================================================== */}
           {activeTab === 'status' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Konektivitas & Status API</h1>
@@ -860,7 +898,7 @@ export default function App() {
               </div>
 
               <div className="api-status-list">
-                <Panel className="api-status-row">
+                <Panel isGlass={liquidGlassEnabled} className="api-status-row">
                   <div className="api-status-lead">
                     <span className="api-method post">POST</span>
                     <div>
@@ -868,10 +906,13 @@ export default function App() {
                       <div className="api-desc">Menerima denyut baterai, status ujian, dan suhu dari APK siswa</div>
                     </div>
                   </div>
-                  <div className="api-badge online">200 OK · Active</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CopyButton text={`http://${window.location.host}/api/telemetry`} label="Salin URL" />
+                    <div className="api-badge online">200 OK · Active</div>
+                  </div>
                 </Panel>
 
-                <Panel className="api-status-row">
+                <Panel isGlass={liquidGlassEnabled} className="api-status-row">
                   <div className="api-status-lead">
                     <span className="api-method get">GET</span>
                     <div>
@@ -879,10 +920,13 @@ export default function App() {
                       <div className="api-desc">Streaming Server-Sent Events (SSE) update realtime ke dashboard</div>
                     </div>
                   </div>
-                  <div className="api-badge online">Connected</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CopyButton text={`http://${window.location.host}/api/events`} label="Salin URL" />
+                    <div className="api-badge online">Connected</div>
+                  </div>
                 </Panel>
 
-                <Panel className="api-status-row">
+                <Panel isGlass={liquidGlassEnabled} className="api-status-row">
                   <div className="api-status-lead">
                     <span className="api-method post">POST</span>
                     <div>
@@ -890,10 +934,13 @@ export default function App() {
                       <div className="api-desc">Gerbang verifikasi login kredensial Super-Admin (rick/rick)</div>
                     </div>
                   </div>
-                  <div className="api-badge online">Secured</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CopyButton text={`http://${window.location.host}/api/login`} label="Salin URL" />
+                    <div className="api-badge online">Secured</div>
+                  </div>
                 </Panel>
 
-                <Panel className="api-status-row">
+                <Panel isGlass={liquidGlassEnabled} className="api-status-row">
                   <div className="api-status-lead">
                     <span className="api-method post">POST</span>
                     <div>
@@ -901,7 +948,10 @@ export default function App() {
                       <div className="api-desc">RPC pembukaan kunci layar ujian jarak jauh dari Super-Admin</div>
                     </div>
                   </div>
-                  <div className="api-badge online">Ready</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CopyButton text={`http://${window.location.host}/api/students/unlock`} label="Salin URL" />
+                    <div className="api-badge online">Ready</div>
+                  </div>
                 </Panel>
               </div>
             </div>
@@ -911,7 +961,7 @@ export default function App() {
           {/* TAB 5: USER (ID) / DATA SISWA TABLE                                 */}
           {/* =================================================================== */}
           {activeTab === 'users' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Data Siswa & Perangkat (User ID)</h1>
@@ -919,7 +969,7 @@ export default function App() {
                 </div>
               </div>
 
-              <Panel className="user-table-wrapper">
+              <Panel isGlass={liquidGlassEnabled} className="user-table-wrapper">
                 <table className="user-data-table">
                   <thead>
                     <tr>
@@ -988,7 +1038,7 @@ export default function App() {
           {/* TAB 6: AKUN SUPER-ADMIN                                             */}
           {/* =================================================================== */}
           {activeTab === 'account' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Profil & Keamanan Akun</h1>
@@ -996,7 +1046,7 @@ export default function App() {
                 </div>
               </div>
 
-              <Panel className="settings-card">
+              <Panel isGlass={liquidGlassEnabled} className="settings-card">
                 <div className="account-profile-header">
                   <div className="profile-large-avatar">R</div>
                   <div>
@@ -1044,7 +1094,7 @@ export default function App() {
           {/* TAB 7: SETTINGS                                                     */}
           {/* =================================================================== */}
           {activeTab === 'settings' && (
-            <div className="tab-fade-in">
+            <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
                   <h1 className="workspace-title">Pengaturan Sistem & Tampilan</h1>
@@ -1052,7 +1102,7 @@ export default function App() {
                 </div>
               </div>
 
-              <Panel className="settings-card">
+              <Panel isGlass={liquidGlassEnabled} className="settings-card">
                 {/* 1. TOGGLE LIQUID GLASS vs STANDAR */}
                 <div className="setting-row">
                   <div className="setting-info">
@@ -1108,8 +1158,8 @@ export default function App() {
                     <h4>Endpoint Telemetry APK Siswa</h4>
                     <p>{`http://${window.location.host}/api/telemetry`}</p>
                   </div>
-                  <Button variant="glass" icon={copied ? <Check size={16} /> : <Copy size={16} />} onClick={copyEndpoint}>
-                    {copied ? 'Tersalin!' : 'Salin URL'}
+                  <Button variant="glass" icon={copiedEndpoint ? <Check size={16} /> : <Copy size={16} />} onClick={copyEndpoint}>
+                    {copiedEndpoint ? 'Tersalin!' : 'Salin URL'}
                   </Button>
                 </div>
 
@@ -1131,7 +1181,6 @@ export default function App() {
 
       {/* ===================================================================== */}
       {/* MOBILE (ANDROID) BOTTOM NAVBAR                                         */}
-      {/* Specified by user: home(dashboard), status api, monitoring, akun       */}
       {/* ===================================================================== */}
       {isMobile && (
         <div className="mobile-bottom-nav-container">
@@ -1187,7 +1236,7 @@ export default function App() {
       {/* ===================================================================== */}
       {selectedStudent && (
         <div className="modal-backdrop" onClick={() => setSelectedStudentId(null)}>
-          <Panel className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <Panel isGlass={liquidGlassEnabled} className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <div className="modal-identity">
@@ -1220,7 +1269,7 @@ export default function App() {
             </div>
 
             <div className="modal-quad-grid">
-              <Panel className="quad-cell">
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
                 <div className="quad-label">
                   <Battery size={16} />
                   <span>Baterai</span>
@@ -1229,7 +1278,7 @@ export default function App() {
                 <div className="quad-desc">{selectedStudent.isCharging ? '⚡ Sedang Mengecas' : 'Daya Baterai'}</div>
               </Panel>
 
-              <Panel className="quad-cell">
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
                 <div className="quad-label">
                   <Wifi size={16} />
                   <span>WiFi / Jaringan</span>
@@ -1238,7 +1287,7 @@ export default function App() {
                 <div className="quad-desc">{selectedStudent.network || 'SMAN18-GUEST'}</div>
               </Panel>
 
-              <Panel className="quad-cell">
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
                 <div className="quad-label">
                   <Activity size={16} />
                   <span>Ping Jaringan</span>
@@ -1247,7 +1296,7 @@ export default function App() {
                 <div className="quad-desc">Responsif & Stabil</div>
               </Panel>
 
-              <Panel className="quad-cell">
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
                 <div className="quad-label">
                   <Thermometer size={16} />
                   <span>Suhu HP</span>
