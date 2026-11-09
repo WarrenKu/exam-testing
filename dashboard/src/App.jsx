@@ -831,10 +831,9 @@ export default function App() {
   if (!token) {
     return (
       <div className={`login-screen ${liquidGlassEnabled ? 'liquid-mode' : 'standard-mode'}`}>
-        {liquidGlassEnabled && <div className="login-ambient-glow"></div>}
         <Panel isGlass={liquidGlassEnabled} className="login-card">
           <div className="login-head">
-            {/* Logo Resmi SMAN 18 Batam (Clean Transparent Background) */}
+            {/* Logo Resmi SMAN 18 Batam (Clean Transparent Background - No Glow) */}
             <div className="login-logo-wrapper">
               <div className="login-logo-badge">
                 <img
@@ -846,7 +845,7 @@ export default function App() {
               <div className="login-logo-text">
                 <span>UjianKita</span>
                 <span style={{ color: 'var(--text-concrete)', fontWeight: 400 }}>·</span>
-                <span style={{ fontSize: 13, color: '#10B981' }}>CBT System</span>
+                <span style={{ fontSize: 13, color: '#38BDF8', fontWeight: 700 }}>CBT System</span>
               </div>
             </div>
 
@@ -885,7 +884,7 @@ export default function App() {
 
             <Button
               variant="filled"
-              tint="#10B981"
+              tint="#0284C7"
               type="submit"
               style={{ width: '100%', height: 44, marginTop: 8 }}
             >
@@ -894,7 +893,7 @@ export default function App() {
           </form>
 
           <div className="login-foot">
-            <ShieldCheck size={14} color="#10B981" />
+            <ShieldCheck size={14} color="#38BDF8" />
             <span>Akses Terenkripsi & Terproteksi · SMAN 18 Batam</span>
           </div>
         </Panel>
@@ -926,7 +925,7 @@ export default function App() {
         </div>
 
         <div className="sidebar-school-tag">
-          <CircleDot size={12} color="#10B981" />
+          <CircleDot size={12} color="#0284C7" />
           <span>SMAN 18 BATAM</span>
         </div>
 
@@ -1144,7 +1143,7 @@ export default function App() {
               <div className="dashboard-double-cards">
                 <Panel isGlass={liquidGlassEnabled} className="banner-card">
                   <div className="banner-card-head">
-                    <Zap size={18} color="#10B981" />
+                    <Zap size={18} color="#0284C7" />
                     <h3>Status Sistem & Pelaksanaan</h3>
                   </div>
                   <div className="banner-card-body">
@@ -1164,10 +1163,10 @@ export default function App() {
                       <span>Rate Sinyal / Ping</span>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                         <span className={`signal-pulse-dot ${serverStatus === 'offline' ? 'dot-offline' : ''}`}></span>
-                        <strong style={{ color: serverStatus === 'offline' ? '#EF4444' : '#10B981', fontFamily: 'var(--font-mono)' }}>
+                        <strong style={{ color: serverStatus === 'offline' ? '#EF4444' : '#0284C7', fontFamily: 'var(--font-mono)' }}>
                           {serverStatus === 'offline' ? 'Terputus (0 ms)' : `${serverPing} ms`}
                         </strong>
-                        <span style={{ fontSize: 11, color: serverStatus === 'offline' ? '#EF4444' : '#34d399', fontWeight: 600 }}>
+                        <span style={{ fontSize: 11, color: serverStatus === 'offline' ? '#EF4444' : '#38BDF8', fontWeight: 600 }}>
                           {serverStatus === 'offline' ? '(Offline)' : '(Sangat Cepat)'}
                         </span>
                       </div>
@@ -1579,14 +1578,14 @@ export default function App() {
                   {viewAsRole === 'superadmin' ? (
                     <Button
                       variant="filled"
-                      tint="#10B981"
+                      tint="#0284C7"
                       icon={<UserPlus size={16} />}
                       onClick={() => setShowAddTeacherModal(true)}
                     >
                       + Tambah Akun Guru
                     </Button>
                   ) : (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: 13, fontWeight: 600 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, background: 'rgba(2, 132, 199, 0.12)', border: '1px solid rgba(2, 132, 199, 0.3)', color: '#38BDF8', fontSize: 13, fontWeight: 600 }}>
                       <ShieldCheck size={16} />
                       <span>Hak Akses Guru: Monitoring & Buka Kunci Siswa</span>
                     </div>
@@ -1598,11 +1597,11 @@ export default function App() {
               <Panel isGlass={liquidGlassEnabled} className="privacy-guard-card super-hebat-mode">
                 <div className="privacy-guard-left">
                   <div className="privacy-shield-icon super-hebat-glow">
-                    <Zap size={24} color="#10B981" />
+                    <Zap size={24} color="#0284C7" />
                   </div>
                   <div>
                     <div className="privacy-guard-title">
-                      <span style={{ fontSize: 16, fontWeight: 800, color: '#10B981' }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: '#38BDF8' }}>
                         KAMU HEBAT
                       </span>
                       <span className="privacy-guard-badge badge-super">
@@ -1620,7 +1619,7 @@ export default function App() {
               {teacherNotification && (
                 <div className="teacher-toast-alert">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CheckCircle2 size={18} color="#10B981" />
+                    <CheckCircle2 size={18} color="#0284C7" />
                     <span>{teacherNotification}</span>
                   </div>
                   <button
@@ -1769,7 +1768,7 @@ export default function App() {
 
                             {/* Otoritas & Hak Akses */}
                             <td>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: isDev ? '#34d399' : '#10B981' }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: isDev ? '#38BDF8' : '#0284C7' }}>
                                 {isDev ? 'Akses Penuh Arsitektur Root' : 'Monitoring Siswa & Buka Kunci'}
                               </div>
                               <div style={{ fontSize: 11, color: 'var(--text-concrete)' }}>
@@ -2229,11 +2228,11 @@ export default function App() {
             {selectedTeacherForDetail.isSuperAdmin && (
               <div
                 className="locked-warning-banner"
-                style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                style={{ background: 'rgba(2, 132, 199, 0.1)', borderColor: 'rgba(2, 132, 199, 0.3)' }}
               >
-                <Zap size={20} color="#10B981" />
+                <Zap size={20} color="#0284C7" />
                 <div>
-                  <strong style={{ color: '#34d399' }}>Akun Developer Root (Super-Admin)</strong>
+                  <strong style={{ color: '#38BDF8' }}>Akun Developer Root (Super-Admin)</strong>
                   <div style={{ fontSize: 12, marginTop: 2, color: 'var(--text-concrete)' }}>
                     Akun ini memegang hak akses penuh arsitektur sistem. Akun ini tidak dapat dihapus dan otomatis disembunyikan dari peran Guru dan Pengawas biasa demi privasi.
                   </div>
@@ -2298,7 +2297,7 @@ export default function App() {
               </div>
               <div className="info-stat-row">
                 <span>Hak Otoritas & Akses</span>
-                <strong style={{ color: '#10B981' }}>{selectedTeacherForDetail.privilege || 'Monitoring Siswa & Buka Kunci Layar'}</strong>
+                <strong style={{ color: '#0284C7' }}>{selectedTeacherForDetail.privilege || 'Monitoring Siswa & Buka Kunci Layar'}</strong>
               </div>
               <div className="info-stat-row">
                 <span>Terakhir Login</span>
@@ -2416,7 +2415,7 @@ export default function App() {
                 <button className="ui-action-btn" type="button" onClick={() => setShowAddTeacherModal(false)}>
                   Batal
                 </button>
-                <Button variant="filled" tint="#10B981" type="submit">
+                <Button variant="filled" tint="#0284C7" type="submit">
                   Simpan Akun Guru
                 </Button>
               </div>
