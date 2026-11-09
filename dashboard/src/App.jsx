@@ -530,6 +530,19 @@ export default function App() {
     return { total, guru, proktor, admin, dev };
   }, [teachers, viewAsRole]);
 
+  // Shared Admin Menu Items (Used in Desktop topbar and Mobile bottom navbar)
+  const adminMenuItems = useMemo(
+    () => [
+      { label: 'Refresh Data SSE', icon: <RefreshCw size={15} />, onSelect: connectSSE },
+      { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
+      { label: 'Ekspor Data CSV', icon: <Download size={15} />, onSelect: handleExportCSV },
+      { label: 'Pengaturan', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
+      'separator',
+      { label: 'Bersihkan Sesi / Demo', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true },
+    ],
+    [students]
+  );
+
   // Metrics Count
   const counts = useMemo(() => {
     let total = 0,
@@ -788,18 +801,11 @@ export default function App() {
               />
             </div>
 
-            {/* Kelvin Zhang Glisse Menu Component */}
-            <div className="topbar-menu-wrapper">
+            {/* Kelvin Zhang Glisse Menu Component (Desktop) */}
+            <div className="topbar-menu-wrapper desktop-only-menu">
               <Menu
                 aria-label="Menu Aksi Super-Admin"
-                items={[
-                  { label: 'Refresh Data SSE', icon: <RefreshCw size={15} />, onSelect: connectSSE },
-                  { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
-                  { label: 'Ekspor Data CSV', icon: <Download size={15} />, onSelect: handleExportCSV },
-                  { label: 'Pengaturan', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
-                  'separator',
-                  { label: 'Bersihkan Sesi / Demo', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true },
-                ]}
+                items={adminMenuItems}
               />
             </div>
 
@@ -1587,54 +1593,65 @@ export default function App() {
       </div>
 
       {/* ===================================================================== */}
-      {/* MOBILE (ANDROID) BOTTOM NAVBAR                                         */}
+      {/* MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU                           */}
       {/* ===================================================================== */}
       {isMobile && (
         <div className="mobile-bottom-nav-container">
-          {liquidGlassEnabled ? (
-            <TabBar
-              aria-label="Navigasi Android"
-              value={activeTab}
-              onValueChange={(val) => val && setActiveTab(val)}
-              items={[
-                { value: 'dashboard', label: 'Home', icon: <LayoutDashboard size={20} /> },
-                { value: 'monitoring', label: 'Monitoring', icon: <Monitor size={20} /> },
-                { value: 'status', label: 'Status API', icon: <Activity size={20} /> },
-                { value: 'account', label: 'Akun', icon: <ShieldCheck size={20} /> },
-              ]}
+          <div className="mobile-nav-pill-wrapper">
+            {liquidGlassEnabled ? (
+              <TabBar
+                aria-label="Navigasi Android"
+                value={activeTab}
+                onValueChange={(val) => val && setActiveTab(val)}
+                items={[
+                  { value: 'dashboard', label: 'Home', icon: <LayoutDashboard size={20} /> },
+                  { value: 'monitoring', label: 'Monitoring', icon: <Monitor size={20} /> },
+                  { value: 'status', label: 'Status API', icon: <Activity size={20} /> },
+                  { value: 'account', label: 'Akun', icon: <ShieldCheck size={20} /> },
+                ]}
+              />
+            ) : (
+              <div className="standard-bottom-nav-bar">
+                <button
+                  className={`std-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('dashboard')}
+                >
+                  <LayoutDashboard size={18} />
+                  <span>Home</span>
+                </button>
+                <button
+                  className={`std-nav-btn ${activeTab === 'monitoring' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('monitoring')}
+                >
+                  <Monitor size={18} />
+                  <span>Monitoring</span>
+                </button>
+                <button
+                  className={`std-nav-btn ${activeTab === 'status' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('status')}
+                >
+                  <Activity size={18} />
+                  <span>Status API</span>
+                </button>
+                <button
+                  className={`std-nav-btn ${activeTab === 'account' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('account')}
+                >
+                  <ShieldCheck size={18} />
+                  <span>Akun</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Tombol Menu Aksi (Dipindahkan ke samping navbar sesuai screenshot) */}
+          <div className="mobile-menu-action-wrapper">
+            <Menu
+              aria-label="Menu Opsi Aksi"
+              align="end"
+              items={adminMenuItems}
             />
-          ) : (
-            <div className="standard-bottom-nav-bar">
-              <button
-                className={`std-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setActiveTab('dashboard')}
-              >
-                <LayoutDashboard size={18} />
-                <span>Home</span>
-              </button>
-              <button
-                className={`std-nav-btn ${activeTab === 'monitoring' ? 'active' : ''}`}
-                onClick={() => setActiveTab('monitoring')}
-              >
-                <Monitor size={18} />
-                <span>Monitoring</span>
-              </button>
-              <button
-                className={`std-nav-btn ${activeTab === 'status' ? 'active' : ''}`}
-                onClick={() => setActiveTab('status')}
-              >
-                <Activity size={18} />
-                <span>Status API</span>
-              </button>
-              <button
-                className={`std-nav-btn ${activeTab === 'account' ? 'active' : ''}`}
-                onClick={() => setActiveTab('account')}
-              >
-                <ShieldCheck size={18} />
-                <span>Akun</span>
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
 

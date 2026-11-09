@@ -1393,7 +1393,7 @@ body {
 }
 
 /* ==========================================================================
-   MOBILE (ANDROID) BOTTOM NAVBAR
+   MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU COMPANION
    ========================================================================== */
 .mobile-bottom-nav-container {
   position: fixed;
@@ -1402,9 +1402,75 @@ body {
   transform: translateX(-50%);
   z-index: 999;
   width: calc(100% - 24px);
-  max-width: 440px;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mobile-nav-pill-wrapper {
+  flex: 1;
   display: flex;
   justify-content: center;
+  min-width: 0;
+}
+
+.mobile-nav-pill-wrapper > * {
+  width: 100%;
+}
+
+.mobile-menu-action-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Style the Menu trigger button at bottom right (companion to navbar) */
+.mobile-menu-action-wrapper .lg-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.mobile-menu-action-wrapper .lg-menu > button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--lg-glass, rgba(41, 41, 41, 0.65));
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid var(--lg-edge, rgba(240, 239, 234, 0.18));
+  color: var(--text-bone);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-action-wrapper .lg-menu > button:hover {
+  background: rgba(60, 60, 60, 0.85);
+  border-color: rgba(240, 239, 234, 0.35);
+}
+
+.standard-mode .mobile-menu-action-wrapper .lg-menu > button {
+  background: #1c1c1f;
+  border: 1px solid var(--surface-graphite);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Ensure popover expands UPWARDS above the bottom nav */
+.mobile-menu-action-wrapper .lg-menu-card {
+  top: auto !important;
+  bottom: 56px !important;
+  right: 0 !important;
+  transform-origin: calc(100% - 24px) 100% !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(240, 239, 234, 0.18) !important;
 }
 
 .standard-bottom-nav-bar {
@@ -1538,6 +1604,10 @@ body {
 @media (max-width: 768px) {
   .admin-desktop-sidebar {
     display: none; /* Hide left sidebar on mobile */
+  }
+
+  .desktop-only-menu, .topbar-menu-wrapper {
+    display: none !important; /* Menu moved to bottom navigation bar on mobile */
   }
 
   .mobile-only-brand {
