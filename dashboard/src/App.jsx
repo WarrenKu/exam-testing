@@ -1038,9 +1038,6 @@ export default function App() {
                   <div className="stat-info">
                     <div className="stat-value">{counts.total}</div>
                     <div className="stat-label">Total Peserta Ujian</div>
-                    <div className="stat-sub-info">
-                      <span>Sesi Terdaftar di SMAN 18</span>
-                    </div>
                   </div>
                 </Panel>
 
@@ -1058,14 +1055,6 @@ export default function App() {
                   <div className="stat-info">
                     <div className="stat-value text-blue">{counts.selesai}</div>
                     <div className="stat-label">🔵 Selesai Ujian (Terkirim)</div>
-                    <div className={`stat-signal-rate ${serverStatus === 'offline' ? 'rate-offline' : ''}`}>
-                      <span className={`signal-pulse-dot ${serverStatus === 'offline' ? 'dot-offline' : ''}`}></span>
-                      <Activity size={12} color={serverStatus === 'offline' ? '#EF4444' : '#10B981'} />
-                      <span>
-                        Rate Sinyal: <strong>{serverStatus === 'offline' ? 'Terputus (0 ms)' : `${serverPing} ms`}</strong>
-                        {serverStatus === 'offline' ? ' (Offline)' : ' (Sangat Cepat)'}
-                      </span>
-                    </div>
                   </div>
                 </Panel>
               </div>
@@ -1110,6 +1099,18 @@ export default function App() {
                     <div className="info-stat-row">
                       <span>Auto-Purge Inaktif</span>
                       <strong>18 Detik Tanpa Heartbeat</strong>
+                    </div>
+                    <div className="info-stat-row">
+                      <span>Rate Sinyal / Ping</span>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <span className={`signal-pulse-dot ${serverStatus === 'offline' ? 'dot-offline' : ''}`}></span>
+                        <strong style={{ color: serverStatus === 'offline' ? '#EF4444' : '#10B981', fontFamily: 'var(--font-mono)' }}>
+                          {serverStatus === 'offline' ? 'Terputus (0 ms)' : `${serverPing} ms`}
+                        </strong>
+                        <span style={{ fontSize: 11, color: serverStatus === 'offline' ? '#EF4444' : '#34d399', fontWeight: 600 }}>
+                          {serverStatus === 'offline' ? '(Offline)' : '(Sangat Cepat)'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </Panel>
