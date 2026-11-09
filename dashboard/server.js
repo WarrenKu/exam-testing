@@ -238,6 +238,20 @@ async function requestHandler(req, res) {
 
   // --- API ROUTES ---
 
+  // 0. Server Health & Realtime Communication Status Check
+  if (pathname === '/api/health' && req.method === 'GET') {
+    return sendJson(res, 200, {
+      status: 'online',
+      message: 'Server Realtime Terhubung & Siap Berkomunikasi',
+      domain: req.headers.host || 'sman18.warren.my.id',
+      timestamp: Date.now(),
+      studentsCount: students.size,
+      connectedClients: sseClients.size,
+      activeBroadcast: Boolean(activeBroadcast),
+      uptimeSeconds: Math.floor(process.uptime()),
+    });
+  }
+
   // 1. Login
   if (pathname === '/api/login' && req.method === 'POST') {
     const { username, password } = await parseBody(req);

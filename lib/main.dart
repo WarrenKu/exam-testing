@@ -1674,48 +1674,6 @@ class SettingsPage extends StatelessWidget {
           title: const Text('Bilah Navigasi Liquid Glass'),
           subtitle: const Text('Efek kaca mengambang semi-transparan dengan blur (Liquid Glass).'),
         ),
-        ListTile(
-          leading: const Icon(Icons.dns_outlined),
-          title: const Text('Server Realtime Dashboard'),
-          subtitle: FutureBuilder<String>(
-            future: SharedPreferences.getInstance().then(
-                (p) => p.getString('dashboard_server_url') ?? 'http://10.0.2.2:5000'),
-            builder: (ctx, snap) => Text(snap.data ?? 'http://10.0.2.2:5000'),
-          ),
-          onTap: () async {
-            final prefs = await SharedPreferences.getInstance();
-            final currentUrl =
-                prefs.getString('dashboard_server_url') ?? 'http://10.0.2.2:5000';
-            final controller = TextEditingController(text: currentUrl);
-            if (!context.mounted) return;
-            final newUrl = await showDialog<String>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Alamat Server Dashboard'),
-                content: TextField(
-                  controller: controller,
-                  decoration: const InputDecoration(
-                    labelText: 'URL Server (contoh: http://192.168.1.100:5000)',
-                    hintText: 'http://10.0.2.2:5000',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Batal')),
-                  FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(ctx, controller.text.trim()),
-                      child: const Text('Simpan')),
-                ],
-              ),
-            );
-            if (newUrl != null && newUrl.isNotEmpty) {
-              await prefs.setString('dashboard_server_url', newUrl);
-              (context as Element).markNeedsBuild();
-            }
-          },
-        ),
         if (devModeUnlocked) ...[
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -1899,8 +1857,12 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   Future<void> _sendTelemetry({String? overrideStatus, int? overrideLeaveCount}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverUrl = prefs.getString('dashboard_server_url')?.trim() ?? 'http://10.0.2.2:5000';
-      if (serverUrl.isEmpty) return;
+      var serverUrl = prefs.getString('dashboard_server_url')?.trim() ?? '';
+      // Otomatis gunakan domain resmi SMAN 18 Batam (https://sman18.warren.my.id)
+      if (serverUrl.isEmpty || serverUrl.contains('10.0.2.2') || serverUrl.contains('localhost')) {
+        serverUrl = 'https://sman18.warren.my.id';
+        await prefs.setString('dashboard_server_url', serverUrl);
+      }
 
       final stats = await KioskService.getStats();
       final currentStatus = overrideStatus ??

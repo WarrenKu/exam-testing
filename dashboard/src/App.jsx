@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Menu, TabBar, Switch, Button, Glass, Input, SearchField, SegmentedControl } from 'glisse';
 import {
   LayoutDashboard,
@@ -159,6 +159,12 @@ export default function App() {
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [broadcastFeedback, setBroadcastFeedback] = useState('');
 
+  // Realtime Inter-Server Connectivity State
+  const [serverStatus, setServerStatus] = useState('online'); // 'online' | 'offline' | 'checking'
+  const [serverPing, setServerPing] = useState(30);
+  const [lastHealthCheck, setLastHealthCheck] = useState('');
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
   const eventSourceRef = useRef(null);
 
   // Responsive detector
@@ -178,6 +184,36 @@ export default function App() {
     localStorage.setItem('ujiankita_sound_alert', soundAlertEnabled ? 'true' : 'false');
   }, [soundAlertEnabled]);
 
+  // Realtime Server Health & Inter-communication Check
+  const checkServerHealth = useCallback(async () => {
+    setIsCheckingHealth(true);
+    const start = performance.now();
+    try {
+      const res = await fetch('/api/health', { cache: 'no-store' });
+      const elapsed = Math.max(12, Math.round(performance.now() - start));
+      if (res.ok) {
+        setServerStatus('online');
+        setServerPing(elapsed);
+        setLastHealthCheck(new Date().toLocaleTimeString('id-ID'));
+      } else {
+        setServerStatus('offline');
+        setLastHealthCheck(new Date().toLocaleTimeString('id-ID'));
+      }
+    } catch {
+      setServerStatus('offline');
+      setLastHealthCheck(new Date().toLocaleTimeString('id-ID'));
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }, []);
+
+  // Periodically verify inter-server communication
+  useEffect(() => {
+    checkServerHealth();
+    const timer = setInterval(checkServerHealth, 6000);
+    return () => clearInterval(timer);
+  }, [checkServerHealth]);
+
   // SSE Realtime Connection
   const connectSSE = () => {
     if (eventSourceRef.current) {
@@ -186,6 +222,10 @@ export default function App() {
 
     const es = new EventSource('/api/events');
     eventSourceRef.current = es;
+
+    es.onopen = () => {
+      setServerStatus('online');
+    };
 
     es.onmessage = (event) => {
       try {
@@ -484,7 +524,7 @@ export default function App() {
 
   // Copy endpoint handler
   const copyEndpoint = () => {
-    const url = `http://${window.location.host}/api/telemetry`;
+    const url = `${window.location.protocol}//${window.location.host}/api/telemetry`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedEndpoint(true);
       setTimeout(() => setCopiedEndpoint(false), 2000);
@@ -1018,10 +1058,13 @@ export default function App() {
                   <div className="stat-info">
                     <div className="stat-value text-blue">{counts.selesai}</div>
                     <div className="stat-label">🔵 Selesai Ujian (Terkirim)</div>
-                    <div className="stat-signal-rate">
-                      <span className="signal-pulse-dot"></span>
-                      <Activity size={12} color="#10B981" />
-                      <span>Rate Sinyal: <strong>30 ms</strong> (Sangat Cepat)</span>
+                    <div className={`stat-signal-rate ${serverStatus === 'offline' ? 'rate-offline' : ''}`}>
+                      <span className={`signal-pulse-dot ${serverStatus === 'offline' ? 'dot-offline' : ''}`}></span>
+                      <Activity size={12} color={serverStatus === 'offline' ? '#EF4444' : '#10B981'} />
+                      <span>
+                        Rate Sinyal: <strong>{serverStatus === 'offline' ? 'Terputus (0 ms)' : `${serverPing} ms`}</strong>
+                        {serverStatus === 'offline' ? ' (Offline)' : ' (Sangat Cepat)'}
+                      </span>
                     </div>
                   </div>
                 </Panel>
@@ -1269,29 +1312,126 @@ export default function App() {
           )}
 
           {/* =================================================================== */}
-          {/* TAB 4: STATUS (API)                                                 */}
+          {/* TAB 4: STATUS (API) - REALTIME INTER-SERVER HEALTH                  */}
           {/* =================================================================== */}
           {activeTab === 'status' && (
             <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
-                  <h1 className="workspace-title">Konektivitas & Status API</h1>
-                  <p className="workspace-sub">Diagnostik kesehatan REST API dan aliran telemetri siswa.</p>
+                  <h1 className="workspace-title">Konektivitas & Status API Realtime</h1>
+                  <p className="workspace-sub">
+                    Diagnostik kesehatan REST API dan inter-komunikasi telemetri server SMAN 18 Batam.
+                  </p>
+                </div>
+                <div className="workspace-header-actions">
+                  <Button
+                    variant="outline"
+                    onClick={checkServerHealth}
+                    disabled={isCheckingHealth}
+                  >
+                    <RefreshCw size={14} className={isCheckingHealth ? 'spin' : ''} />
+                    <span>{isCheckingHealth ? 'Menguji Sinyal...' : 'Uji Ulang Koneksi'}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Inter-Server Realtime Health Banner */}
+              <Panel
+                isGlass={liquidGlassEnabled}
+                className={`api-main-health-banner ${serverStatus === 'online' ? 'banner-online' : 'banner-offline'}`}
+              >
+                <div className="api-health-left">
+                  <div className={`api-health-icon-wrap ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                    {serverStatus === 'online' ? (
+                      <Activity size={26} color="#10B981" />
+                    ) : (
+                      <AlertTriangle size={26} color="#EF4444" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="api-health-title-row">
+                      <span>
+                        {serverStatus === 'online'
+                          ? 'ONLINE · SERVER SALING TERHUBUNG REALTIME'
+                          : serverStatus === 'checking'
+                          ? 'MEMERIKSA KONEKSI SERVER...'
+                          : 'OFFLINE · KOMUNIKASI SERVER TERPUTUS'}
+                      </span>
+                      <span className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                        {serverStatus === 'online' ? `Aktif · ${serverPing} ms` : 'Tidak Terhubung'}
+                      </span>
+                    </div>
+                    <p className="api-health-desc">
+                      {serverStatus === 'online' ? (
+                        <>
+                          Inter-komunikasi antar server (Engine SSE & Telemetry REST Ingestion) <strong>terverifikasi aktif</strong> pada domain <code>{window.location.host || 'sman18.warren.my.id'}</code>. Data denyut siswa dan dashboard sinkron secara instan.
+                        </>
+                      ) : (
+                        <>
+                          Gagal menghubungi backend di <code>{window.location.host || 'sman18.warren.my.id'}</code>. Harap periksa apakah server backend sedang aktif atau terdapat gangguan jaringan.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </Panel>
+
+              {/* Telemetry Metric Grid */}
+              <div className="api-telemetry-grid">
+                <div className="api-telemetry-item">
+                  <span className="api-telemetry-label">Status Komunikasi</span>
+                  <span className="api-telemetry-val" style={{ color: serverStatus === 'online' ? '#10B981' : '#EF4444' }}>
+                    {serverStatus === 'online' ? '● Online (Aktif)' : '○ Offline'}
+                  </span>
+                </div>
+                <div className="api-telemetry-item">
+                  <span className="api-telemetry-label">Latensi Round-Trip</span>
+                  <span className="api-telemetry-val" style={{ color: serverStatus === 'online' ? '#38BDF8' : '#898989' }}>
+                    {serverStatus === 'online' ? `${serverPing} ms` : '0 ms'}
+                  </span>
+                </div>
+                <div className="api-telemetry-item">
+                  <span className="api-telemetry-label">Protokol Stream</span>
+                  <span className="api-telemetry-val">SSE EventStream</span>
+                </div>
+                <div className="api-telemetry-item">
+                  <span className="api-telemetry-label">Waktu Pengecekan</span>
+                  <span className="api-telemetry-val" style={{ fontSize: 13 }}>
+                    {lastHealthCheck || 'Baru saja'}
+                  </span>
                 </div>
               </div>
 
               <div className="api-status-list">
                 <Panel isGlass={liquidGlassEnabled} className="api-status-row">
                   <div className="api-status-lead">
-                    <span className="api-method post">POST</span>
+                    <span className="api-method get">GET</span>
                     <div>
-                      <div className="api-url">/api/telemetry</div>
-                      <div className="api-desc">Menerima denyut baterai, status ujian, dan suhu dari APK siswa</div>
+                      <div className="api-url">/api/health</div>
+                      <div className="api-desc">Diagnostik kesehatan backend, status uptime, dan inter-komunikasi realtime</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CopyButton text={`http://${window.location.host}/api/telemetry`} label="Salin URL" />
-                    <div className="api-badge online">200 OK · Active</div>
+                    <CopyButton text={`${window.location.protocol}//${window.location.host}/api/health`} label="Salin URL" />
+                    <div className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                      {serverStatus === 'online' ? `Online · 200 OK (${serverPing}ms)` : 'Offline'}
+                    </div>
+                  </div>
+                </Panel>
+
+                <Panel isGlass={liquidGlassEnabled} className="api-status-row">
+                  <div className="api-status-lead">
+                    <span className="api-method post">POST</span>
+                    <div>
+                      <div className="api-url">/api/telemetry</div>
+                      <div className="api-desc">Menerima denyut baterai, status ujian, suhu, dan deteksi pelanggaran dari APK siswa</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CopyButton text={`${window.location.protocol}//${window.location.host}/api/telemetry`} label="Salin URL" />
+                    <div className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                      {serverStatus === 'online' ? 'Online · Siap Menerima Data' : 'Offline'}
+                    </div>
                   </div>
                 </Panel>
 
@@ -1300,12 +1440,14 @@ export default function App() {
                     <span className="api-method get">GET</span>
                     <div>
                       <div className="api-url">/api/events</div>
-                      <div className="api-desc">Streaming Server-Sent Events (SSE) update realtime ke dashboard</div>
+                      <div className="api-desc">Streaming Server-Sent Events (SSE) sinkronisasi update realtime ke dashboard</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CopyButton text={`http://${window.location.host}/api/events`} label="Salin URL" />
-                    <div className="api-badge online">Connected</div>
+                    <CopyButton text={`${window.location.protocol}//${window.location.host}/api/events`} label="Salin URL" />
+                    <div className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                      {serverStatus === 'online' ? 'Online · SSE Connected' : 'Offline · Terputus'}
+                    </div>
                   </div>
                 </Panel>
 
@@ -1318,8 +1460,10 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CopyButton text={`http://${window.location.host}/api/login`} label="Salin URL" />
-                    <div className="api-badge online">Secured</div>
+                    <CopyButton text={`${window.location.protocol}//${window.location.host}/api/login`} label="Salin URL" />
+                    <div className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                      {serverStatus === 'online' ? 'Online · Secured' : 'Offline'}
+                    </div>
                   </div>
                 </Panel>
 
@@ -1332,8 +1476,10 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CopyButton text={`http://${window.location.host}/api/students/unlock`} label="Salin URL" />
-                    <div className="api-badge online">Ready</div>
+                    <CopyButton text={`${window.location.protocol}//${window.location.host}/api/students/unlock`} label="Salin URL" />
+                    <div className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                      {serverStatus === 'online' ? 'Online · Ready' : 'Offline'}
+                    </div>
                   </div>
                 </Panel>
 
@@ -1342,12 +1488,14 @@ export default function App() {
                     <span className="api-method get">GET</span>
                     <div>
                       <div className="api-url">/api/teachers</div>
-                      <div className="api-desc">REST API akun guru & staf (Super-Admin otomatis disembunyikan untuk peran reguler)</div>
+                      <div className="api-desc">REST API sinkronisasi data akun dewan guru & staf CBT</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CopyButton text={`http://${window.location.host}/api/teachers`} label="Salin URL" />
-                    <div className="api-badge online">Active · Protected</div>
+                    <CopyButton text={`${window.location.protocol}//${window.location.host}/api/teachers`} label="Salin URL" />
+                    <div className={`api-badge ${serverStatus === 'online' ? 'online' : 'offline'}`}>
+                      {serverStatus === 'online' ? 'Online · Protected' : 'Offline'}
+                    </div>
                   </div>
                 </Panel>
               </div>
@@ -1733,7 +1881,7 @@ export default function App() {
                 <div className="setting-row">
                   <div className="setting-info">
                     <h4>Endpoint Telemetry APK Siswa</h4>
-                    <p>{`http://${window.location.host}/api/telemetry`}</p>
+                    <p>{`${window.location.protocol}//${window.location.host}/api/telemetry`}</p>
                   </div>
                   <button className="ui-action-btn" onClick={copyEndpoint}>
                     {copiedEndpoint ? <Check size={16} color="#10B981" /> : <Copy size={16} />}
