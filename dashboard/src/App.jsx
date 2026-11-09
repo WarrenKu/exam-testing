@@ -708,13 +708,15 @@ export default function App() {
       items.push(
         { label: 'Pengaturan Sistem', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
         'separator',
-        { label: 'Bersihkan Sesi', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true }
+        { label: 'Bersihkan Sesi', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true },
+        { label: 'Logout', icon: <LogOut size={15} />, onSelect: handleLogout, destructive: true }
+      );
+    } else {
+      items.push(
+        'separator',
+        { label: 'Logout', icon: <LogOut size={15} />, onSelect: handleLogout, destructive: true }
       );
     }
-    items.push(
-      'separator',
-      { label: 'Logout', icon: <LogOut size={15} />, onSelect: handleLogout, destructive: true }
-    );
     return items;
   }, [students, viewAsRole]);
 
