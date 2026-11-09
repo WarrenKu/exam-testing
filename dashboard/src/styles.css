@@ -512,6 +512,61 @@ body {
   margin-top: 3px;
 }
 
+.stat-sub-info {
+  font-size: 11px;
+  color: var(--text-concrete);
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.stat-signal-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  font-size: 11px;
+  font-weight: 600;
+  color: #10B981;
+  width: fit-content;
+}
+
+.stat-signal-rate strong {
+  color: #34d399;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.signal-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10B981;
+  box-shadow: 0 0 8px #10B981;
+  animation: signalPulse 1.8s infinite ease-in-out;
+}
+
+@keyframes signalPulse {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 4px #10B981;
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px #34d399;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 4px #10B981;
+    opacity: 0.8;
+  }
+}
+
 /* Glowing dots for stat cards */
 .status-dot {
   width: 14px;
@@ -1089,16 +1144,18 @@ body {
 
 /* Privacy Guard Banner */
 .privacy-guard-card {
-  padding: 18px 20px;
+  padding: 18px 22px;
   border-radius: 20px;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  justify-content: flex-start;
+  gap: 16px;
   background: linear-gradient(135deg, rgba(22, 22, 25, 0.95), rgba(15, 23, 20, 0.9));
   border: 1px solid rgba(16, 185, 129, 0.25);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .privacy-guard-card.super-hebat-mode {
@@ -1129,15 +1186,15 @@ body {
 
 .privacy-guard-left {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  gap: 16px;
   flex: 1;
 }
 
 .privacy-shield-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.35);
   display: flex;
@@ -1146,11 +1203,16 @@ body {
   flex-shrink: 0;
 }
 
+.super-hebat-glow {
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
 .privacy-guard-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--text-bone);
 }
@@ -1174,64 +1236,30 @@ body {
   line-height: 1.5;
 }
 
-.privacy-guard-toggle-box {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
-  flex-shrink: 0;
-}
-
-.privacy-toggle-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-concrete);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.role-simulator-buttons {
-  display: flex;
-  gap: 6px;
-  background: rgba(13, 13, 15, 0.8);
-  padding: 4px;
-  border-radius: 12px;
-  border: 1px solid var(--surface-graphite);
-}
-
-.sim-role-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-concrete);
-  border: none;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-}
-
-.sim-role-btn:hover {
-  color: var(--text-bone);
-  background: rgba(41, 41, 41, 0.6);
-}
-
-.sim-role-btn.active-super {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.45);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
-}
-
-.sim-role-btn.active-regular {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+@media (max-width: 768px) {
+  .privacy-guard-card {
+    padding: 14px 16px;
+    border-radius: 16px;
+    gap: 12px;
+  }
+  .privacy-guard-left {
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .privacy-shield-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+  .privacy-guard-title {
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 14px;
+  }
+  .privacy-guard-desc {
+    font-size: 11px;
+    line-height: 1.4;
+  }
 }
 
 /* Role Filter Chips */
@@ -1975,6 +2003,42 @@ body {
   background: rgba(20, 20, 24, 0.95) !important;
   backdrop-filter: blur(24px) !important;
   -webkit-backdrop-filter: blur(24px) !important;
+}
+
+/* Menu Text & Icon Styling (Always Crisp & Visible) */
+.lg-menu-card {
+  color: #F0EFEA !important;
+}
+
+.lg-menu-card .lg-menu-item {
+  color: #F0EFEA !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+}
+
+.lg-menu-card .lg-menu-item svg {
+  color: #38BDF8 !important;
+  flex-shrink: 0 !important;
+}
+
+.lg-menu-card .lg-menu-item:hover,
+.lg-menu-card .lg-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #38BDF8 !important;
+}
+
+.lg-menu-card .lg-menu-item[data-destructive] {
+  color: #EF4444 !important;
+}
+
+.lg-menu-card .lg-menu-item[data-destructive] svg {
+  color: #EF4444 !important;
 }
 
 /* Hilangkan delay trailing kotak hitam saat menu ditutup (Instant Clean Dismissal) */

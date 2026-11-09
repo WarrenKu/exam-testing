@@ -33,10 +33,8 @@ import {
   Info,
   UserPlus,
   Eye,
-  EyeOff,
   Key,
   GraduationCap,
-  ShieldAlert,
   CheckCircle2
 } from 'lucide-react';
 
@@ -1000,6 +998,9 @@ export default function App() {
                   <div className="stat-info">
                     <div className="stat-value">{counts.total}</div>
                     <div className="stat-label">Total Peserta Ujian</div>
+                    <div className="stat-sub-info">
+                      <span>Sesi Terdaftar di SMAN 18</span>
+                    </div>
                   </div>
                 </Panel>
 
@@ -1017,6 +1018,11 @@ export default function App() {
                   <div className="stat-info">
                     <div className="stat-value text-blue">{counts.selesai}</div>
                     <div className="stat-label">🔵 Selesai Ujian (Terkirim)</div>
+                    <div className="stat-signal-rate">
+                      <span className="signal-pulse-dot"></span>
+                      <Activity size={12} color="#10B981" />
+                      <span>Rate Sinyal: <strong>30 ms</strong> (Sangat Cepat)</span>
+                    </div>
                   </div>
                 </Panel>
               </div>
@@ -1380,57 +1386,23 @@ export default function App() {
               </div>
 
               {/* ROLE PRIVACY SHIELD & SUPER-ADMIN BANNER */}
-              <Panel isGlass={liquidGlassEnabled} className={`privacy-guard-card ${viewAsRole === 'superadmin' ? 'super-hebat-mode' : 'warning-global-mode'}`}>
+              <Panel isGlass={liquidGlassEnabled} className="privacy-guard-card super-hebat-mode">
                 <div className="privacy-guard-left">
-                  <div className="privacy-shield-icon">
-                    {viewAsRole === 'superadmin' ? (
-                      <Zap size={24} color="#10B981" />
-                    ) : (
-                      <ShieldAlert size={24} color="#F59E0B" />
-                    )}
+                  <div className="privacy-shield-icon super-hebat-glow">
+                    <Zap size={24} color="#10B981" />
                   </div>
                   <div>
                     <div className="privacy-guard-title">
-                      <span style={{ fontSize: 16, fontWeight: 800, color: viewAsRole === 'superadmin' ? '#10B981' : '#F59E0B' }}>
-                        {viewAsRole === 'superadmin' ? 'KAMU HEBAT' : 'PERINGATAN: AREA TERPROTEKSI'}
+                      <span style={{ fontSize: 16, fontWeight: 800, color: '#10B981' }}>
+                        KAMU HEBAT
                       </span>
-                      <span className={`privacy-guard-badge ${viewAsRole === 'superadmin' ? 'badge-super' : 'badge-warning'}`}>
-                        {viewAsRole === 'superadmin' ? '🌟 Super-Admin Root' : '⚠️ Otoritas Terbatas'}
+                      <span className="privacy-guard-badge badge-super">
+                        🌟 Super-Admin Root
                       </span>
                     </div>
                     <p className="privacy-guard-desc">
-                      {viewAsRole === 'superadmin' ? (
-                        <>
-                          Akses <strong>Super-Admin (rick)</strong> aktif! Seluruh kontrol pengawasan CBT, bypass kiosk, dan wewenang akun dewan guru berada dalam kendali penuhmu.
-                        </>
-                      ) : (
-                        <>
-                          <strong>Peringatan Privasi:</strong> Akun tingkat developer (Super-Admin) disembunyikan secara otomatis. Anda beroperasi di bawah tampilan dan wewenang guru/pengawas ruang standar.
-                        </>
-                      )}
+                      Akses <strong>Super-Admin (rick)</strong> aktif! Seluruh kontrol pengawasan CBT, bypass kiosk, dan wewenang akun dewan guru berada dalam kendali penuhmu.
                     </p>
-                  </div>
-                </div>
-
-                <div className="privacy-guard-toggle-box">
-                  <div className="privacy-toggle-label">Simulasi Pandangan Akses:</div>
-                  <div className="role-simulator-buttons">
-                    <button
-                      className={`sim-role-btn ${viewAsRole === 'superadmin' ? 'active-super' : ''}`}
-                      onClick={() => setViewAsRole('superadmin')}
-                      title="Lihat semua akun termasuk Super-Admin (Dev Mode)"
-                    >
-                      <Zap size={14} />
-                      <span>Mode Super-Admin (Dev)</span>
-                    </button>
-                    <button
-                      className={`sim-role-btn ${viewAsRole === 'regular' ? 'active-regular' : ''}`}
-                      onClick={() => setViewAsRole('regular')}
-                      title="Simulasi pandangan Guru / Pengawas biasa (Super-Admin disembunyikan otomatis)"
-                    >
-                      <EyeOff size={14} />
-                      <span>Pandangan Guru / Staf</span>
-                    </button>
                   </div>
                 </div>
               </Panel>
