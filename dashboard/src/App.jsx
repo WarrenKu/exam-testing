@@ -151,6 +151,7 @@ export default function App() {
     }
   }); // 'superadmin' vs 'regular'
   const [selectedTeacherForDetail, setSelectedTeacherForDetail] = useState(null);
+  const [teacherToEdit, setTeacherToEdit] = useState(null);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [teacherNotification, setTeacherNotification] = useState('');
   const [newTeacher, setNewTeacher] = useState({
@@ -754,6 +755,42 @@ export default function App() {
     }
   };
 
+    // Otoritas Edit: Hanya Super-Admin dan Admin yang dapat mengedit/mengubah akun
+  const canEdit = Boolean(
+    currentUser?.isSuperAdmin ||
+    (currentUser?.role && currentUser.role.toLowerCase().includes('admin'))
+  );
+
+  const handleUpdateTeacher = async (e) => {
+    e.preventDefault();
+    if (!teacherToEdit || !teacherToEdit.id) return;
+    try {
+      const res = await fetch('/api/teachers/edit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(teacherToEdit),
+      });
+      const data = await res.json();
+      if (res.ok && data.teacher) {
+        setTeachers((prev) =>
+          prev.map((t) => (t.id === data.teacher.id ? { ...t, ...data.teacher } : t))
+        );
+        setTeacherToEdit(null);
+        setSelectedTeacherForDetail(null);
+        setTeacherNotification(`Data akun ${data.teacher.name} berhasil diperbarui!`);
+        setTimeout(() => setTeacherNotification(''), 4000);
+      } else {
+        alert(data.error || 'Gagal memperbarui data guru');
+      }
+    } catch (err) {
+      console.error('Update teacher error:', err);
+      alert('Gagal menghubungi server');
+    }
+  };
+
   // Filtered teachers list with Developer Privacy Shield
   const filteredTeachers = useMemo(() => {
     return teachers.filter((t) => {
@@ -767,7 +804,7 @@ export default function App() {
       if (userRoleFilter === 'offline' && t.isOnline) return false;
       if (userRoleFilter === 'guru' && !t.role.toLowerCase().includes('guru')) return false;
       if (userRoleFilter === 'proktor' && !t.role.toLowerCase().includes('proktor')) return false;
-      if (userRoleFilter === 'admin' && !t.role.toLowerCase().includes('admin kurikulum')) return false;
+      if (userRoleFilter === 'admin' && !t.role.toLowerCase().includes('admin')) return false;
       if (userRoleFilter === 'dev' && !t.isSuperAdmin) return false;
 
       // Text search
@@ -799,7 +836,7 @@ export default function App() {
       if (t.isOnline) online++;
       else offline++;
       if (t.isSuperAdmin) dev++;
-      else if (t.role.toLowerCase().includes('admin kurikulum')) admin++;
+      else if (t.role.toLowerCase().includes('admin')) admin++;
       else if (t.role.toLowerCase().includes('proktor')) proktor++;
       else guru++;
     }
@@ -1697,7 +1734,7 @@ export default function App() {
                   </p>
                 </div>
                 <div className="workspace-header-actions">
-                  {currentUser?.isSuperAdmin ? (
+                  {canEdit ? (
                     <Button
                       variant="filled"
                       tint="#0284C7"
@@ -1708,8 +1745,8 @@ export default function App() {
                     </Button>
                   ) : (
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, background: 'rgba(2, 132, 199, 0.12)', border: '1px solid rgba(2, 132, 199, 0.3)', color: '#38BDF8', fontSize: 13, fontWeight: 600 }}>
-                      <ShieldCheck size={16} />
-                      <span>Hak Akses Guru: Monitoring & Buka Kunci Siswa</span>
+                      <Eye size={16} />
+                      <span>Mode Tinjau (${currentUser?.role || 'Guru'}) · Akses Lihat Data</span>
                     </div>
                   )}
                 </div>
@@ -1947,12 +1984,20 @@ export default function App() {
                                 <button
                                   className="table-action-btn"
                                   onClick={() => setSelectedTeacherForDetail(t)}
-                                  title="Lihat detail hak akses guru"
+                                  title="Lihat detail & status akun"
                                 >
                                   Detail
                                 </button>
-                                {currentUser?.isSuperAdmin && !isDev && (
+                                {canEdit && !isDev && (
                                   <>
+                                    <button
+                                      className="table-action-btn"
+                                      onClick={() => setTeacherToEdit({ ...t })}
+                                      title="Edit data akun guru"
+                                      style={{ borderColor: 'rgba(2, 132, 199, 0.45)', color: '#38BDF8' }}
+                                    >
+                                      Edit
+                                    </button>
                                     <button
                                       className="table-action-btn"
                                       onClick={() => handleResetTeacherPassword(t)}
@@ -2463,8 +2508,18 @@ export default function App() {
             </div>
 
             <div className="modal-footer">
-              {currentUser?.isSuperAdmin && !selectedTeacherForDetail.isSuperAdmin && (
+              {canEdit && !selectedTeacherForDetail.isSuperAdmin && (
                 <>
+                  <button
+                    className="ui-action-btn"
+                    style={{ borderColor: 'rgba(2, 132, 199, 0.5)', color: '#38BDF8' }}
+                    onClick={() => {
+                      setTeacherToEdit({ ...selectedTeacherForDetail });
+                      setSelectedTeacherForDetail(null);
+                    }}
+                  >
+                    Edit Data Akun
+                  </button>
                   <button
                     className="ui-action-btn"
                     onClick={() => handleToggleTeacherStatus(selectedTeacherForDetail.id)}
@@ -2479,7 +2534,17 @@ export default function App() {
                       setSelectedTeacherForDetail(null);
                     }}
                   >
-                    Reset Password
+                    Reset PIN
+                  </button>
+                  <button
+                    className="ui-action-btn"
+                    style={{ borderColor: 'rgba(239, 68, 68, 0.5)', color: '#EF4444' }}
+                    onClick={() => {
+                      handleDeleteTeacher(selectedTeacherForDetail.id, selectedTeacherForDetail.name);
+                      setSelectedTeacherForDetail(null);
+                    }}
+                  >
+                    Hapus Akun
                   </button>
                 </>
               )}
@@ -2570,6 +2635,116 @@ export default function App() {
                 </button>
                 <Button variant="filled" tint="#0284C7" type="submit">
                   Simpan Akun Guru
+                </Button>
+              </div>
+            </form>
+          </Panel>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: SIARAN PENGUMUMAN MASSAL KE SEMUA SISWA (BROADCAST ALL)       */}
+      {/* ===================================================================== */}
+      
+      {/* MODAL: EDIT DATA AKUN GURU (Khusus Super-Admin & Admin) */}
+      {teacherToEdit && (
+        <div className="modal-backdrop" onClick={() => setTeacherToEdit(null)}>
+          <Panel isGlass={liquidGlassEnabled} className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-name">Edit Data Akun Guru / Staf</div>
+                <div className="modal-sub">ID: {teacherToEdit.id} · NSID: <strong style={{ color: '#38BDF8' }}>{teacherToEdit.nsid || teacherToEdit.id}</strong></div>
+              </div>
+              <button
+                className="modal-close-btn"
+                onClick={() => setTeacherToEdit(null)}
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTeacher} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">Nama Lengkap & Gelar</label>
+                <Input
+                  value={teacherToEdit.name || ''}
+                  onValueChange={(val) => setTeacherToEdit((prev) => ({ ...prev, name: val }))}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">NIP / Kode Guru</label>
+                <Input
+                  value={teacherToEdit.nip || ''}
+                  onValueChange={(val) => setTeacherToEdit((prev) => ({ ...prev, nip: val }))}
+                  placeholder="Contoh: 19890415 201201 2 007 atau PM"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Peran / Role Petugas</label>
+                <select
+                  className="form-select-input"
+                  value={teacherToEdit.role || 'Guru Mata Pelajaran'}
+                  onChange={(e) => setTeacherToEdit((prev) => ({ ...prev, role: e.target.value }))}
+                >
+                  <option value="Guru Mata Pelajaran">👨‍🏫 Guru Mata Pelajaran</option>
+                  <option value="Guru Wali">🧑‍🏫 Guru Wali (GW)</option>
+                  <option value="Guru BK">💼 Bimbingan Konseling (BK)</option>
+                  <option value="Proktor CBT">🛡️ Proktor CBT</option>
+                  <option value="Admin Kurikulum">📊 Admin Kurikulum</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Mata Pelajaran</label>
+                <Input
+                  value={teacherToEdit.subject || ''}
+                  onValueChange={(val) => setTeacherToEdit((prev) => ({ ...prev, subject: val }))}
+                  placeholder="Contoh: Matematika (MTK)"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Kelas yang Diampu</label>
+                <Input
+                  value={teacherToEdit.classes || ''}
+                  onValueChange={(val) => setTeacherToEdit((prev) => ({ ...prev, classes: val }))}
+                  placeholder="Contoh: XI.1 - XI.4 atau Semua Rombel"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ganti Password (Opsional)</label>
+                <Input
+                  type="password"
+                  value={teacherToEdit.password || ''}
+                  onValueChange={(val) => setTeacherToEdit((prev) => ({ ...prev, password: val }))}
+                  placeholder="Ketik untuk mengubah password akun ini"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Status Akun</label>
+                <select
+                  className="form-select-input"
+                  value={teacherToEdit.status || 'Aktif'}
+                  onChange={(e) => setTeacherToEdit((prev) => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="Aktif">🟢 Aktif (Dapat Login)</option>
+                  <option value="Nonaktif">🔴 Nonaktif (Dibekukan)</option>
+                </select>
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: 10 }}>
+                <button className="ui-action-btn" type="button" onClick={() => setTeacherToEdit(null)}>
+                  Batal
+                </button>
+                <Button variant="filled" tint="#0284C7" type="submit">
+                  Simpan Perubahan
                 </Button>
               </div>
             </form>

@@ -327,6 +327,20 @@ function checkAuth(req) {
   return activeTokens.has(token);
 }
 
+function getAuthUser(req) {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  return activeTokens.get(token) || null;
+}
+
+function canEditStaff(req) {
+  const user = getAuthUser(req);
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  const role = String(user.role || '').toLowerCase();
+  return role.includes('admin');
+}
+
 // MIME types for static file serving
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -749,6 +763,9 @@ async function requestHandler(req, res) {
 
   if (pathname === '/api/teachers' && req.method === 'POST') {
     if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    if (!canEditStaff(req)) {
+      return sendJson(res, 403, { error: 'Hanya Super-Admin dan Admin yang memiliki izin menambah akun guru.' });
+    }
     const payload = await parseBody(req);
     if (!payload.name) return sendJson(res, 400, { error: 'Nama guru wajib diisi' });
     
@@ -775,8 +792,34 @@ async function requestHandler(req, res) {
     return sendJson(res, 201, { success: true, teacher: newUser });
   }
 
+  if (pathname === '/api/teachers/edit' && req.method === 'POST') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    if (!canEditStaff(req)) {
+      return sendJson(res, 403, { error: 'Hanya Super-Admin dan Admin yang memiliki izin mengedit data guru.' });
+    }
+    const payload = await parseBody(req);
+    const target = staffUsers.find(u => u.id === payload.id);
+    if (!target) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
+    if (target.isSuperAdmin && !getAuthUser(req)?.isSuperAdmin) {
+      return sendJson(res, 403, { error: 'Hanya Super-Admin yang dapat mengedit akun Super-Admin.' });
+    }
+
+    if (payload.name) target.name = String(payload.name).trim();
+    if (payload.nip !== undefined) target.nip = String(payload.nip).trim();
+    if (payload.role) target.role = String(payload.role).trim();
+    if (payload.subject) target.subject = String(payload.subject).trim();
+    if (payload.classes !== undefined) target.classes = String(payload.classes).trim();
+    if (payload.status) target.status = String(payload.status).trim();
+    if (payload.password) target.password = String(payload.password).trim();
+
+    return sendJson(res, 200, { success: true, teacher: target });
+  }
+
   if (pathname === '/api/teachers/toggle-status' && req.method === 'POST') {
     if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    if (!canEditStaff(req)) {
+      return sendJson(res, 403, { error: 'Hanya Super-Admin dan Admin yang memiliki izin mengubah status keaktifan akun.' });
+    }
     const { id } = await parseBody(req);
     const user = staffUsers.find(u => u.id === id);
     if (!user) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
@@ -787,10 +830,14 @@ async function requestHandler(req, res) {
 
   if (pathname === '/api/teachers/reset-password' && req.method === 'POST') {
     if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    if (!canEditStaff(req)) {
+      return sendJson(res, 403, { error: 'Hanya Super-Admin dan Admin yang memiliki izin mereset sandi akun.' });
+    }
     const { id } = await parseBody(req);
     const user = staffUsers.find(u => u.id === id);
     if (!user) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
     const tempPass = 'UK-' + Math.floor(100000 + Math.random() * 900000);
+    user.password = tempPass;
     return sendJson(res, 200, {
       success: true,
       message: `Password akun ${user.name} berhasil direset!`,
@@ -800,6 +847,9 @@ async function requestHandler(req, res) {
 
   if (pathname === '/api/teachers' && req.method === 'DELETE') {
     if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    if (!canEditStaff(req)) {
+      return sendJson(res, 403, { error: 'Hanya Super-Admin dan Admin yang memiliki izin menghapus akun.' });
+    }
     const { id } = await parseBody(req);
     const target = staffUsers.find(u => u.id === id);
     if (!target) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
