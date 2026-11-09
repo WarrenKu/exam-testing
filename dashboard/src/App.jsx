@@ -344,16 +344,17 @@ export default function App() {
     }
   }, [token, viewAsRole]);
 
-  // Auto Stale Cleanup (Safely checks before updating state to avoid re-renders)
+  // Auto Stale Cleanup: Only auto-purge after 20 MINUTES (1,200,000 ms) without signal
   useEffect(() => {
     const timer = setInterval(() => {
       const now = Date.now();
+      const twentyMinutes = 20 * 60 * 1000;
       setStudents((prev) => {
-        const hasStale = prev.some((s) => now - s.lastSeen > 18000);
+        const hasStale = prev.some((s) => now - s.lastSeen > twentyMinutes);
         if (!hasStale) return prev;
-        return prev.filter((s) => now - s.lastSeen <= 18000);
+        return prev.filter((s) => now - s.lastSeen <= twentyMinutes);
       });
-    }, 3000);
+    }, 15000);
     return () => clearInterval(timer);
   }, []);
 
@@ -473,10 +474,18 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // Clear demo / reset
-  const handleResetSession = () => {
+  // Clear sessions / reset
+  const handleResetSession = async () => {
     if (confirm('Bersihkan seluruh data sesi monitoring ujian saat ini?')) {
       handleToggleSimulator(false);
+      try {
+        await fetch('/api/students/clear', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (err) {
+        console.error('Clear sessions error:', err);
+      }
       setStudents([]);
     }
   };
@@ -779,14 +788,15 @@ export default function App() {
     return students.find((s) => s.deviceId === selectedStudentId) || null;
   }, [students, selectedStudentId]);
 
-  // Status Presentation Helper
-  const getStatusPresentation = (status, leaveCount) => {
+  // Status Presentation Helper (With offline detection without purging)
+  const getStatusPresentation = (status, leaveCount, lastSeen) => {
+    const isOffline = lastSeen && (Date.now() - lastSeen > 25000);
     switch (status) {
       case 'mengerjakan':
         return {
-          title: '🟢 Mengerjakan',
-          sub: 'Fokus Soal',
-          className: 'status-mengerjakan',
+          title: isOffline ? '⚪ Offline / Putus Sinyal' : '🟢 Mengerjakan',
+          sub: isOffline ? 'Sinyal Terputus' : 'Fokus Soal',
+          className: isOffline ? 'status-keluar' : 'status-mengerjakan',
         };
       case 'keluar':
         return {
@@ -1148,7 +1158,7 @@ export default function App() {
                     </div>
                     <div className="info-stat-row">
                       <span>Auto-Purge Inaktif</span>
-                      <strong>18 Detik Tanpa Heartbeat</strong>
+                      <strong>20 Menit Tanpa Sinyal (atau Bersihkan Sesi)</strong>
                     </div>
                     <div className="info-stat-row">
                       <span>Rate Sinyal / Ping</span>
@@ -1245,7 +1255,7 @@ export default function App() {
               ) : (
                 <div className="students-grid">
                   {filteredStudents.map((s) => {
-                    const meta = getStatusPresentation(s.status, s.leaveCount);
+                    const meta = getStatusPresentation(s.status, s.leaveCount, s.lastSeen);
                     const timeFormatted = new Date(s.startTime || Date.now()).toLocaleTimeString('id-ID', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -2053,12 +2063,12 @@ export default function App() {
               </button>
             </div>
 
-            <div className={`card-status-badge ${getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount).className}`}>
+            <div className={`card-status-badge ${getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount, selectedStudent.lastSeen).className}`}>
               <div className="status-badge-left">
                 <span className="status-dot"></span>
-                <span>{getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount).title}</span>
+                <span>{getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount, selectedStudent.lastSeen).title}</span>
               </div>
-              <span>({getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount).sub})</span>
+              <span>({getStatusPresentation(selectedStudent.status, selectedStudent.leaveCount, selectedStudent.lastSeen).sub})</span>
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--text-concrete)', textTransform: 'uppercase' }}>

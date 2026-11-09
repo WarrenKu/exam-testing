@@ -661,6 +661,14 @@ class _TokenPageState extends State<TokenPage> {
             ),
           ),
         );
+        // Otomatis reset input token dan status ketika kembali dari sesi ujian
+        if (mounted) {
+          setState(() {
+            _tokenController.clear();
+            _message = null;
+            _isLoading = false;
+          });
+        }
       } else {
         // Jika ada beberapa mapel dengan token yang sama, tampilkan halaman pilihan
         await Navigator.of(context).push(
@@ -675,6 +683,14 @@ class _TokenPageState extends State<TokenPage> {
             ),
           ),
         );
+        // Otomatis reset input token dan status ketika kembali dari sesi ujian
+        if (mounted) {
+          setState(() {
+            _tokenController.clear();
+            _message = null;
+            _isLoading = false;
+          });
+        }
       }
     } on SheetException catch (error) {
       setState(() => _message = error.message);
@@ -1773,7 +1789,7 @@ class ExamSelectionPage extends StatelessWidget {
       );
       return;
     }
-    Navigator.of(context).push(
+    final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ExamSessionPage(
           exam: exam,
@@ -1784,6 +1800,9 @@ class ExamSelectionPage extends StatelessWidget {
         ),
       ),
     );
+    if (result == true && context.mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   @override
@@ -1853,6 +1872,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   String? _activeBroadcastMessage;
   String? _activeBroadcastTitle;
   Timer? _broadcastDismissTimer;
+  bool _isExiting = false;
+  bool _isConfirmingExit = false;
 
   Future<void> _sendTelemetry({String? overrideStatus, int? overrideLeaveCount}) async {
     try {
@@ -2019,6 +2040,8 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
 
   @override
   void dispose() {
+    _isExiting = true;
+    _isConfirmingExit = false;
     _telemetryTimer?.cancel();
     _broadcastDismissTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -2038,7 +2061,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (widget.devNoDetectViolations) return;
+    if (_isExiting || _isConfirmingExit || widget.devNoDetectViolations) return;
     if (state != AppLifecycleState.paused || _locked) return;
     setState(() {
       _leaveCount += 1;
@@ -2089,12 +2112,22 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   }
 
   void _restartWithToken() {
-    Navigator.of(context).pop();
+    _isExiting = true;
+    _isConfirmingExit = false;
+    WidgetsBinding.instance.removeObserver(this);
+    _telemetryTimer?.cancel();
+    _broadcastDismissTimer?.cancel();
+    if (widget.devKioskPinning) {
+      unawaited(KioskService.stopLockTask());
+    }
+    Navigator.of(context).pop(true);
   }
 
   Future<void> _confirmExit() async {
+    setState(() => _isConfirmingExit = true);
     final shouldExit = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('Keluar dari Ujian?'),
         content: const Text(
@@ -2113,11 +2146,19 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
       ),
     );
     if (shouldExit == true && mounted) {
+      _isExiting = true;
+      _isConfirmingExit = false;
+      WidgetsBinding.instance.removeObserver(this);
+      _telemetryTimer?.cancel();
+      _broadcastDismissTimer?.cancel();
+
       unawaited(_sendTelemetry(overrideStatus: 'selesai'));
       if (widget.devKioskPinning) {
         await KioskService.stopLockTask();
       }
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop(true);
+    } else {
+      if (mounted) setState(() => _isConfirmingExit = false);
     }
   }
 

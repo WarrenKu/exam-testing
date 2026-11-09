@@ -212,12 +212,15 @@ const studentBroadcasts = new Map(); // key: deviceId, value: broadcastObj
 // Simulator state
 let simulatorInterval = null;
 
-// Clean up stale students (no heartbeat for 18 seconds)
+// Auto-purge stale students only after 20 MINUTES (1,200,000 ms) without heartbeat
+// Student sessions stay visible even if phone is turned off or signal drops
+const AUTO_PURGE_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+
 setInterval(() => {
   const now = Date.now();
   let changed = false;
   for (const [id, s] of students.entries()) {
-    if (now - s.lastSeen > 18000) {
+    if (now - s.lastSeen > AUTO_PURGE_TIMEOUT_MS) {
       students.delete(id);
       changed = true;
     }
@@ -225,7 +228,7 @@ setInterval(() => {
   if (changed) {
     broadcast({ type: 'SYNC_STUDENTS', students: Array.from(students.values()) });
   }
-}, 3000);
+}, 15000);
 
 // Broadcast event to all connected dashboard SSE clients
 function broadcast(data) {
@@ -508,6 +511,14 @@ async function requestHandler(req, res) {
       return sendJson(res, 200, { success: true });
     }
     return sendJson(res, 404, { error: 'Siswa tidak ditemukan' });
+  }
+
+  // 5b. Clear All Student Sessions (Bersihkan Sesi)
+  if (pathname === '/api/students/clear' && req.method === 'POST') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    students.clear();
+    broadcast({ type: 'INIT', students: [] });
+    return sendJson(res, 200, { success: true, message: 'Seluruh sesi siswa berhasil dibersihkan.' });
   }
 
   // 5b. Realtime Broadcast Command (Single Student or Mass All Students)
