@@ -1679,13 +1679,13 @@ class SettingsPage extends StatelessWidget {
           title: const Text('Server Realtime Dashboard'),
           subtitle: FutureBuilder<String>(
             future: SharedPreferences.getInstance().then(
-                (p) => p.getString('dashboard_server_url') ?? 'http://10.0.2.2:3000'),
-            builder: (ctx, snap) => Text(snap.data ?? 'http://10.0.2.2:3000'),
+                (p) => p.getString('dashboard_server_url') ?? 'http://10.0.2.2:5000'),
+            builder: (ctx, snap) => Text(snap.data ?? 'http://10.0.2.2:5000'),
           ),
           onTap: () async {
             final prefs = await SharedPreferences.getInstance();
             final currentUrl =
-                prefs.getString('dashboard_server_url') ?? 'http://10.0.2.2:3000';
+                prefs.getString('dashboard_server_url') ?? 'http://10.0.2.2:5000';
             final controller = TextEditingController(text: currentUrl);
             if (!context.mounted) return;
             final newUrl = await showDialog<String>(
@@ -1695,8 +1695,8 @@ class SettingsPage extends StatelessWidget {
                 content: TextField(
                   controller: controller,
                   decoration: const InputDecoration(
-                    labelText: 'URL Server (contoh: http://192.168.1.100:3000)',
-                    hintText: 'http://10.0.2.2:3000',
+                    labelText: 'URL Server (contoh: http://192.168.1.100:5000)',
+                    hintText: 'http://10.0.2.2:5000',
                   ),
                 ),
                 actions: [
@@ -1895,7 +1895,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   Future<void> _sendTelemetry({String? overrideStatus, int? overrideLeaveCount}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverUrl = prefs.getString('dashboard_server_url')?.trim() ?? 'http://10.0.2.2:3000';
+      final serverUrl = prefs.getString('dashboard_server_url')?.trim() ?? 'http://10.0.2.2:5000';
       if (serverUrl.isEmpty) return;
 
       final stats = await KioskService.getStats();

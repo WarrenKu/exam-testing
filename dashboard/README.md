@@ -19,8 +19,8 @@ Pastikan Node.js (v18+) sudah terpasang, lalu jalankan di terminal:
 node dashboard/server.js
 ```
 Akses di browser:
-- **Lokal**: `http://localhost:3000`
-- **Jaringan Sekolah / LAN**: `http://<IP-Komputer>:3000` (misal: `http://192.168.1.100:3000`)
+- **Lokal**: `http://localhost:5000`
+- **Jaringan Sekolah / LAN**: `http://<IP-Komputer>:5000` (misal: `http://192.168.1.100:5000`)
 
 ## 📱 Fitur Utama
 1. **Login Super-Admin**: Proteksi akses login dengan token sesi.

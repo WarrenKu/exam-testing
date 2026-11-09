@@ -1,20 +1,21 @@
 /**
- * UjianKita Realtime Monitor · Client Application
- * Glisse Liquid Glass Dashboard Controller
+ * UjianKita Super-Admin Realtime Monitor Controller
+ * Kelvin Zhang Glisse Liquid Glass Architecture & SSE Realtime Engine
  */
 
 // Application State
 const state = {
-  token: localStorage.getItem('ujiankita_auth_token') || '',
+  token: localStorage.getItem('ujiankita_superadmin_token') || '',
   students: new Map(), // key: deviceId, value: StudentData
   activeFilter: 'all',
   searchQuery: '',
   selectedStudentId: null,
   eventSource: null,
   simulatorRunning: false,
+  activeTab: 'monitoring',
 };
 
-// DOM Elements
+// DOM References
 const loginView = document.getElementById('loginView');
 const dashboardView = document.getElementById('dashboardView');
 const loginForm = document.getElementById('loginForm');
@@ -24,10 +25,10 @@ const togglePasswordBtn = document.getElementById('togglePasswordBtn');
 const loginErrorMsg = document.getElementById('loginErrorMsg');
 const logoutBtn = document.getElementById('logoutBtn');
 
-const liveClock = document.getElementById('liveClock');
-const sseStatusText = document.getElementById('sseStatusText');
-const toggleSimulatorBtn = document.getElementById('toggleSimulatorBtn');
-const simBtnText = document.getElementById('simBtnText');
+const liveClockDisplay = document.getElementById('liveClockDisplay');
+const sseStatusLabel = document.getElementById('sseStatusLabel');
+const toggleDemoBtn = document.getElementById('toggleDemoBtn');
+const demoBtnLabel = document.getElementById('demoBtnLabel');
 
 const countAll = document.getElementById('countAll');
 const countMengerjakan = document.getElementById('countMengerjakan');
@@ -36,14 +37,32 @@ const countTerkunci = document.getElementById('countTerkunci');
 const countSelesai = document.getElementById('countSelesai');
 
 const searchInput = document.getElementById('searchInput');
-const filterTabs = document.querySelectorAll('.filter-tab');
+const chipFilters = document.querySelectorAll('.chip-filter');
+const metricCards = document.querySelectorAll('.metric-glass-card');
 const studentsGrid = document.getElementById('studentsGrid');
-const emptyState = document.getElementById('emptyState');
+const emptyGridState = document.getElementById('emptyGridState');
 
-// Modal Elements
-const detailModal = document.getElementById('detailModal');
+// Floating Bottom Nav & Tab Panes
+const glisseTabs = document.querySelectorAll('.lg-tab');
+const tabGlisseThumb = document.getElementById('tabGlisseThumb');
+const tabPanes = {
+  monitoring: document.getElementById('tabContentMonitoring'),
+  violations: document.getElementById('tabContentViolations'),
+  stats: document.getElementById('tabContentStats'),
+  settings: document.getElementById('tabContentSettings'),
+};
+
+const violationsList = document.getElementById('violationsList');
+const integrityRate = document.getElementById('integrityRate');
+const wifiCount = document.getElementById('wifiCount');
+const lowBatteryCount = document.getElementById('lowBatteryCount');
+const copyEndpointBtn = document.getElementById('copyEndpointBtn');
+const telemetryEndpointUrl = document.getElementById('telemetryEndpointUrl');
+
+// Telemetry Modal
+const telemetryModal = document.getElementById('telemetryModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
-const closeModalActionBtn = document.getElementById('closeModalActionBtn');
+const modalDismissBtn = document.getElementById('modalDismissBtn');
 const modalStudentName = document.getElementById('modalStudentName');
 const modalStudentClass = document.getElementById('modalStudentClass');
 const modalDeviceLabel = document.getElementById('modalDeviceLabel');
@@ -55,19 +74,25 @@ const modalBatterySub = document.getElementById('modalBatterySub');
 const modalNetwork = document.getElementById('modalNetwork');
 const modalPing = document.getElementById('modalPing');
 const modalTemperature = document.getElementById('modalTemperature');
-const modalTimeline = document.getElementById('modalTimeline');
+const modalTimelineLogs = document.getElementById('modalTimelineLogs');
 const remoteUnlockBtn = document.getElementById('remoteUnlockBtn');
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
   initClock();
   setupEventListeners();
+  updateFloatingNavThumb();
 
   if (state.token) {
-    showDashboard();
+    verifySession();
   } else {
     showLogin();
   }
+
+  // Adjust floating tab thumb on window resize
+  window.addEventListener('resize', () => {
+    updateFloatingNavThumb();
+  });
 });
 
 // --- Live Clock ---
@@ -75,136 +100,212 @@ function initClock() {
   const updateClock = () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB';
-    liveClock.textContent = timeStr;
+    if (liveClockDisplay) liveClockDisplay.textContent = timeStr;
   };
   updateClock();
   setInterval(updateClock, 1000);
 }
 
-// --- Event Listeners ---
+// --- Auth & Session ---
+async function verifySession() {
+  try {
+    const resp = await fetch('/api/auth/check', {
+      headers: { Authorization: `Bearer ${state.token}` },
+    });
+    const data = await resp.json();
+    if (data.authenticated) {
+      showDashboard();
+    } else {
+      logout();
+    }
+  } catch (_) {
+    showDashboard();
+  }
+}
+
+function showLogin() {
+  loginView.classList.add('active');
+  dashboardView.classList.remove('active');
+  if (state.eventSource) {
+    state.eventSource.close();
+    state.eventSource = null;
+  }
+}
+
+function showDashboard() {
+  loginView.classList.remove('active');
+  dashboardView.classList.add('active');
+  connectSSE();
+  fetchInitialStudents();
+  // Ensure thumb is aligned after rendering
+  setTimeout(updateFloatingNavThumb, 50);
+}
+
+function logout() {
+  localStorage.removeItem('ujiankita_superadmin_token');
+  state.token = '';
+  state.students.clear();
+  showLogin();
+}
+
+// --- Event Listeners Setup ---
 function setupEventListeners() {
-  // Password Visibility Toggle
-  togglePasswordBtn.addEventListener('click', () => {
-    const isPass = passwordInput.type === 'password';
-    passwordInput.type = isPass ? 'text' : 'password';
-  });
+  // 1. Password Visibility Toggle
+  if (togglePasswordBtn) {
+    togglePasswordBtn.addEventListener('click', () => {
+      const isPass = passwordInput.type === 'password';
+      passwordInput.type = isPass ? 'text' : 'password';
+    });
+  }
 
-  // Login Form Submission
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    loginErrorMsg.style.display = 'none';
+  // 2. Login Form
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginErrorMsg.style.display = 'none';
 
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value.trim();
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
 
-    try {
-      const resp = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await resp.json();
+      try {
+        const resp = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await resp.json();
 
-      if (resp.ok && data.success && data.token) {
-        state.token = data.token;
-        localStorage.setItem('ujiankita_auth_token', data.token);
-        showDashboard();
-      } else {
-        loginErrorMsg.textContent = data.message || 'Login gagal. Periksa username dan password.';
+        if (resp.ok && data.success && data.token) {
+          state.token = data.token;
+          localStorage.setItem('ujiankita_superadmin_token', data.token);
+          showDashboard();
+        } else {
+          loginErrorMsg.textContent = data.message || 'Username atau password salah!';
+          loginErrorMsg.style.display = 'block';
+        }
+      } catch (err) {
+        loginErrorMsg.textContent = 'Gagal terhubung ke server backend.';
         loginErrorMsg.style.display = 'block';
       }
-    } catch (err) {
-      loginErrorMsg.textContent = 'Gagal terhubung ke server.';
-      loginErrorMsg.style.display = 'block';
-    }
-  });
+    });
+  }
 
-  // Logout
-  logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('ujiankita_auth_token');
-    state.token = '';
-    if (state.eventSource) state.eventSource.close();
-    showLogin();
-  });
+  // 3. Logout
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', logout);
+  }
 
-  // Search Input
-  searchInput.addEventListener('input', (e) => {
-    state.searchQuery = e.target.value.toLowerCase().trim();
-    renderCards();
-  });
-
-  // Filter Tabs
-  filterTabs.forEach((tab) => {
+  // 4. Glisse Bottom Navbar Tab Switching
+  glisseTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      filterTabs.forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-      state.activeFilter = tab.getAttribute('data-filter');
-      renderCards();
+      const targetTab = tab.getAttribute('data-tab');
+      switchTab(targetTab);
     });
   });
 
-  // Summary Stat Cards click to filter
-  document.querySelectorAll('.stat-card').forEach((card) => {
+  // 5. Search Filtering
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value.toLowerCase().trim();
+      renderStudentsGrid();
+    });
+  }
+
+  // 6. Filter Chips
+  chipFilters.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const filter = chip.getAttribute('data-filter');
+      setFilter(filter);
+    });
+  });
+
+  // 7. Metric Cards click to filter
+  metricCards.forEach((card) => {
     card.addEventListener('click', () => {
-      const filterKey = card.getAttribute('data-status');
-      filterTabs.forEach((t) => {
-        if (t.getAttribute('data-filter') === filterKey) t.click();
-      });
+      const filter = card.getAttribute('data-filter');
+      setFilter(filter);
     });
   });
 
-  // Simulator Toggle
-  toggleSimulatorBtn.addEventListener('click', async () => {
-    try {
-      state.simulatorRunning = !state.simulatorRunning;
-      const resp = await fetch('/api/simulator/toggle', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${state.token}`,
-        },
-        body: JSON.stringify({ active: state.simulatorRunning }),
-      });
-      const data = await resp.json();
-      simBtnText.textContent = data.running ? 'Hentikan Demo' : 'Demo Siswa';
-      toggleSimulatorBtn.classList.toggle('glisse-btn-warning', data.running);
-      toggleSimulatorBtn.classList.toggle('glisse-btn-secondary', !data.running);
-    } catch (_) {}
-  });
-
-  // Modal Close
-  closeModalBtn.addEventListener('click', closeModal);
-  closeModalActionBtn.addEventListener('click', closeModal);
-  detailModal.addEventListener('click', (e) => {
-    if (e.target === detailModal) closeModal();
-  });
-
-  // Remote Unlock Button
-  remoteUnlockBtn.addEventListener('click', async () => {
-    if (!state.selectedStudentId) return;
-    try {
-      const resp = await fetch('/api/students/unlock', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${state.token}`,
-        },
-        body: JSON.stringify({ deviceId: state.selectedStudentId }),
-      });
-      if (resp.ok) {
-        remoteUnlockBtn.style.display = 'none';
-        const s = state.students.get(state.selectedStudentId);
-        if (s) {
-          s.status = 'mengerjakan';
-          s.leaveCount = 0;
-          updateModalData(s);
-          renderCards();
-        }
+  // 8. Demo Simulation Toggle
+  if (toggleDemoBtn) {
+    toggleDemoBtn.addEventListener('click', async () => {
+      try {
+        state.simulatorRunning = !state.simulatorRunning;
+        const resp = await fetch('/api/simulator/toggle', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${state.token}`,
+          },
+          body: JSON.stringify({ active: state.simulatorRunning }),
+        });
+        const data = await resp.json();
+        const isRunning = data.running ?? state.simulatorRunning;
+        demoBtnLabel.textContent = isRunning ? 'Hentikan Demo' : 'Demo Siswa';
+        toggleDemoBtn.classList.toggle('btn-active-demo', isRunning);
+      } catch (err) {
+        console.error('Simulator toggle error:', err);
       }
-    } catch (_) {}
-  });
+    });
+  }
 
-  // Periodic client-side check to remove stale/offline students
+  // 9. Telemetry Modal Dismissals
+  if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+  if (modalDismissBtn) modalDismissBtn.addEventListener('click', closeModal);
+  if (telemetryModal) {
+    telemetryModal.addEventListener('click', (e) => {
+      if (e.target === telemetryModal) closeModal();
+    });
+  }
+
+  // 10. Remote Unlock Action
+  if (remoteUnlockBtn) {
+    remoteUnlockBtn.addEventListener('click', async () => {
+      if (!state.selectedStudentId) return;
+      try {
+        const resp = await fetch('/api/students/unlock', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${state.token}`,
+          },
+          body: JSON.stringify({ deviceId: state.selectedStudentId }),
+        });
+        if (resp.ok) {
+          const s = state.students.get(state.selectedStudentId);
+          if (s) {
+            s.status = 'mengerjakan';
+            s.leaveCount = 0;
+            s.violationLogs.push({
+              timestamp: Date.now(),
+              text: 'Sesi dibuka kembali oleh Super-Admin (Remote Unlock)'
+            });
+            updateModalData(s);
+            updateCounters();
+            renderStudentsGrid();
+          }
+        }
+      } catch (err) {
+        console.error('Unlock error:', err);
+      }
+    });
+  }
+
+  // 11. Copy Telemetry Endpoint
+  if (copyEndpointBtn) {
+    copyEndpointBtn.addEventListener('click', () => {
+      const url = `http://${window.location.host}/api/telemetry`;
+      navigator.clipboard.writeText(url).then(() => {
+        copyEndpointBtn.textContent = 'Tersalin!';
+        setTimeout(() => {
+          copyEndpointBtn.textContent = 'Salin URL';
+        }, 2000);
+      });
+    });
+  }
+
+  // Auto-remove stale students (>18s without response) on client
   setInterval(() => {
     const now = Date.now();
     let hasStale = false;
@@ -212,62 +313,129 @@ function setupEventListeners() {
       if (now - s.lastSeen > 18000) {
         state.students.delete(id);
         hasStale = true;
+        if (state.selectedStudentId === id) {
+          closeModal();
+        }
       }
     }
     if (hasStale) {
       updateCounters();
-      renderCards();
+      renderStudentsGrid();
+      updateViolationsTab();
+      updateStatsTab();
     }
-  }, 4000);
+  }, 3000);
 }
 
-// --- View Switching ---
-function showLogin() {
-  loginView.classList.add('active');
-  dashboardView.classList.remove('active');
+// --- Glisse Bottom Navbar Tab Management ---
+function switchTab(tabId) {
+  state.activeTab = tabId;
+
+  // Toggle active tab button
+  glisseTabs.forEach((tab) => {
+    const isTarget = tab.getAttribute('data-tab') === tabId;
+    tab.classList.toggle('active', isTarget);
+  });
+
+  // Slide thumb
+  updateFloatingNavThumb();
+
+  // Toggle tab contents
+  Object.keys(tabPanes).forEach((id) => {
+    if (tabPanes[id]) {
+      const isActive = id === tabId;
+      tabPanes[id].classList.toggle('active', isActive);
+    }
+  });
+
+  if (tabId === 'violations') updateViolationsTab();
+  if (tabId === 'stats') updateStatsTab();
 }
 
-function showDashboard() {
-  loginView.classList.remove('active');
-  dashboardView.classList.add('active');
-  connectRealtimeSSE();
+function updateFloatingNavThumb() {
+  const activeTabEl = document.querySelector('.lg-tab.active');
+  if (!activeTabEl || !tabGlisseThumb) return;
+
+  const tabRect = activeTabEl.getBoundingClientRect();
+  const parentRect = activeTabEl.parentElement.getBoundingClientRect();
+
+  const left = tabRect.left - parentRect.left;
+  const width = tabRect.width;
+
+  tabGlisseThumb.style.transform = `translateX(${left}px)`;
+  tabGlisseThumb.style.width = `${width}px`;
 }
 
-// --- Realtime SSE Connection ---
-function connectRealtimeSSE() {
+// --- Filter Management ---
+function setFilter(filter) {
+  state.activeFilter = filter;
+
+  chipFilters.forEach((c) => {
+    c.classList.toggle('active', c.getAttribute('data-filter') === filter);
+  });
+
+  metricCards.forEach((m) => {
+    m.classList.toggle('active-filter', m.getAttribute('data-filter') === filter);
+  });
+
+  renderStudentsGrid();
+}
+
+// --- SSE Realtime Streaming ---
+function connectSSE() {
   if (state.eventSource) state.eventSource.close();
 
   state.eventSource = new EventSource('/api/events');
 
   state.eventSource.onopen = () => {
-    sseStatusText.textContent = 'LIVE CONNECTED';
+    if (sseStatusLabel) sseStatusLabel.textContent = 'LIVE SERVER';
   };
 
   state.eventSource.onmessage = (event) => {
     try {
       const payload = JSON.parse(event.data);
+
       if (payload.type === 'INIT' || payload.type === 'SYNC_STUDENTS') {
         state.students.clear();
         (payload.students || []).forEach((s) => state.students.set(s.deviceId, s));
       } else if (payload.type === 'STUDENT_UPDATE' && payload.student) {
         state.students.set(payload.student.deviceId, payload.student);
-        // If modal currently open for this student, update it in realtime
+        // If modal open for this student, live update modal
         if (state.selectedStudentId === payload.student.deviceId) {
           updateModalData(payload.student);
         }
       }
 
       updateCounters();
-      renderCards();
-    } catch (_) {}
+      renderStudentsGrid();
+      if (state.activeTab === 'violations') updateViolationsTab();
+      if (state.activeTab === 'stats') updateStatsTab();
+    } catch (err) {
+      console.error('SSE parse error:', err);
+    }
   };
 
   state.eventSource.onerror = () => {
-    sseStatusText.textContent = 'RECONNECTING...';
+    if (sseStatusLabel) sseStatusLabel.textContent = 'MENGHUBUNGKAN...';
   };
 }
 
-// --- Metrics & Counters ---
+async function fetchInitialStudents() {
+  try {
+    const resp = await fetch('/api/students', {
+      headers: { Authorization: `Bearer ${state.token}` },
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      state.students.clear();
+      (data.students || []).forEach((s) => state.students.set(s.deviceId, s));
+      updateCounters();
+      renderStudentsGrid();
+    }
+  } catch (_) {}
+}
+
+// --- Counters & Metrics ---
 function updateCounters() {
   let total = 0;
   let mengerjakan = 0;
@@ -283,239 +451,296 @@ function updateCounters() {
     else if (s.status === 'selesai') selesai++;
   }
 
-  countAll.textContent = total;
-  countMengerjakan.textContent = mengerjakan;
-  countKeluar.textContent = keluar;
-  countTerkunci.textContent = terkunci;
-  countSelesai.textContent = selesai;
+  if (countAll) countAll.textContent = total;
+  if (countMengerjakan) countMengerjakan.textContent = mengerjakan;
+  if (countKeluar) countKeluar.textContent = keluar;
+  if (countTerkunci) countTerkunci.textContent = terkunci;
+  if (countSelesai) countSelesai.textContent = selesai;
 }
 
-// --- Status Formatters ---
-function getStatusMeta(status, leaveCount) {
-  switch (status) {
-    case 'mengerjakan':
-      return {
-        label: 'Mengerjakan',
-        cssClass: 'status-mengerjakan',
-        badgeHtml: `
-          <div class="status-badge-left">
-            <span class="badge-pulse"></span>
-            <span>🟢 Mengerjakan</span>
-          </div>
-          <span style="font-size: 11px; opacity: 0.8;">Fokus Soal</span>
-        `,
-      };
-    case 'keluar':
-      return {
-        label: `Keluar Aplikasi (${leaveCount || 1}/3)`,
-        cssClass: 'status-keluar',
-        badgeHtml: `
-          <div class="status-badge-left">
-            <span class="badge-pulse"></span>
-            <span>🟡 Keluar Aplikasi (${leaveCount || 1}/3)</span>
-          </div>
-          <span style="font-size: 11px; opacity: 0.9;">Peringatan</span>
-        `,
-      };
-    case 'terkunci':
-      return {
-        label: 'Sesi Terkunci (3/3)',
-        cssClass: 'status-terkunci',
-        badgeHtml: `
-          <div class="status-badge-left">
-            <span class="badge-pulse"></span>
-            <span>🔴 Sesi Terkunci (3/3)</span>
-          </div>
-          <span style="font-size: 11px; font-weight: 800;">TERKUNCI</span>
-        `,
-      };
-    case 'selesai':
-      return {
-        label: 'Selesai Ujian',
-        cssClass: 'status-selesai',
-        badgeHtml: `
-          <div class="status-badge-left">
-            <span class="badge-pulse"></span>
-            <span>🔵 Selesai Ujian</span>
-          </div>
-          <span style="font-size: 11px; opacity: 0.8;">Terkirim</span>
-        `,
-      };
-    default:
-      return {
-        label: 'Aktif',
-        cssClass: 'status-mengerjakan',
-        badgeHtml: `<span>🟢 Aktif</span>`,
-      };
-  }
-}
+// --- Render Student Cards Grid ---
+function renderStudentsGrid() {
+  if (!studentsGrid) return;
 
-// --- Render Student Cards ---
-function renderCards() {
-  studentsGrid.innerHTML = '';
-
-  const studentList = Array.from(state.students.values());
-
-  // Filter based on active tab & search query
-  const filtered = studentList.filter((s) => {
+  const filtered = Array.from(state.students.values()).filter((s) => {
+    // 1. Filter match
     if (state.activeFilter !== 'all' && s.status !== state.activeFilter) {
       return false;
     }
+    // 2. Search match
     if (state.searchQuery) {
-      const q = state.searchQuery;
-      const matchName = (s.name || '').toLowerCase().includes(q);
-      const matchClass = (s.className || '').toLowerCase().includes(q);
-      const matchMapel = (s.subject || '').toLowerCase().includes(q);
-      const matchDevice = (s.deviceLabel || '').toLowerCase().includes(q);
-      if (!matchName && !matchClass && !matchMapel && !matchDevice) return false;
+      const query = state.searchQuery;
+      const matchName = (s.name || '').toLowerCase().includes(query);
+      const matchClass = (s.className || '').toLowerCase().includes(query);
+      const matchDevice = (s.deviceLabel || '').toLowerCase().includes(query);
+      return matchName || matchClass || matchDevice;
     }
     return true;
   });
 
   if (filtered.length === 0) {
-    emptyState.style.display = 'block';
+    studentsGrid.innerHTML = '';
+    if (emptyGridState) emptyGridState.style.display = 'block';
     return;
   }
-  emptyState.style.display = 'none';
 
-  filtered.forEach((s) => {
-    const card = document.createElement('div');
-    card.className = 'student-card glisse-card glisse-lens';
-    card.setAttribute('data-id', s.deviceId);
+  if (emptyGridState) emptyGridState.style.display = 'none';
 
+  studentsGrid.innerHTML = filtered.map((s) => {
     const statusMeta = getStatusMeta(s.status, s.leaveCount);
-    const dateFormatted = new Date(s.lastSeen || Date.now()).toLocaleTimeString('id-ID', {
+    const dateFormatted = new Date(s.startTime || Date.now()).toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-    }) + ' WIB';
+    });
 
-    card.innerHTML = `
-      <div class="card-header-row">
-        <div class="student-name-box">
-          <div class="student-name">${escapeHtml(s.name || 'Siswa')}</div>
-          <div class="student-subject">${escapeHtml(s.subject || 'Mapel')}</div>
-        </div>
-        <span class="glass-pill-sm">${escapeHtml(s.className || 'Kelas')}</span>
-      </div>
+    const isChargingIcon = s.isCharging ? '⚡ ' : '';
+    const batteryText = `${isChargingIcon}${s.batteryLevel || 100}%`;
+    const tempText = `${s.temperature || 36.5}°C`;
+    const pingText = `${s.pingMs || 9}ms`;
 
-      <div class="card-device-row">
-        <div class="device-text">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-            <line x1="12" y1="18" x2="12.01" y2="18"></line>
-          </svg>
-          <span>${escapeHtml(s.deviceLabel || 'Android Device')}</span>
-        </div>
-        <div class="date-text">${dateFormatted}</div>
-      </div>
-
-      <div class="card-status-badge ${statusMeta.cssClass}">
-        ${statusMeta.badgeHtml}
-      </div>
-
-      <div class="card-telemetry-row">
-        <div class="tel-chip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="1" y="6" width="18" height="12" rx="2" ry="2"></rect>
-            <line x1="23" y1="13" x2="23" y2="11"></line>
-          </svg>
-          <span>${s.batteryLevel !== undefined ? s.batteryLevel + '%' : '--'}</span>
+    return `
+      <div class="student-lens-card lg-glass" data-device-id="${s.deviceId}">
+        <div class="card-top-identity">
+          <div>
+            <div class="student-name-text">${escapeHtml(s.name || 'Siswa')}</div>
+          </div>
+          <div class="class-badge-pill">${escapeHtml(s.className || 'X')}</div>
         </div>
 
-        <div class="tel-chip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
-          </svg>
-          <span>${s.temperature ? s.temperature + '°C' : '36°C'}</span>
+        <div class="card-device-date-row">
+          <div class="card-device-meta">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+            <span>${escapeHtml(s.deviceLabel || 'Android')}</span>
+          </div>
+          <div class="card-date-meta">${dateFormatted} WIB</div>
         </div>
 
-        <div class="tel-chip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-          </svg>
-          <span>${s.pingMs || 9}ms</span>
+        <div class="card-status-badge ${statusMeta.cssClass}">
+          <div class="status-badge-lead">
+            <span class="badge-dot-indicator"></span>
+            <span>${statusMeta.title}</span>
+          </div>
+          <span>${statusMeta.subtitle}</span>
         </div>
 
-        <div class="card-hint">Detail →</div>
+        <div class="card-quick-telemetry">
+          <div class="quick-telemetry-chip" title="Baterai">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="1" y="6" width="18" height="12" rx="2" ry="2"></rect>
+              <line x1="23" y1="13" x2="23" y2="11"></line>
+            </svg>
+            <span>${batteryText}</span>
+          </div>
+          <div class="quick-telemetry-chip" title="Ping Jaringan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            <span class="text-green">${pingText}</span>
+          </div>
+          <div class="quick-telemetry-chip" title="Suhu HP">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+            </svg>
+            <span>${tempText}</span>
+          </div>
+        </div>
+
+        <div class="card-click-hint">Klik untuk melihat detail & remote action ➔</div>
       </div>
     `;
+  }).join('');
 
-    card.addEventListener('click', () => openModal(s));
-    studentsGrid.appendChild(card);
+  // Attach card click handlers
+  studentsGrid.querySelectorAll('.student-lens-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const deviceId = card.getAttribute('data-device-id');
+      openModal(deviceId);
+    });
   });
 }
 
-// --- Modal Detailed Telemetry ---
-function openModal(student) {
-  state.selectedStudentId = student.deviceId;
+// --- Status Metadata Helper ---
+function getStatusMeta(status, leaveCount) {
+  switch (status) {
+    case 'mengerjakan':
+      return {
+        title: '🟢 Mengerjakan',
+        subtitle: 'Fokus Soal',
+        cssClass: 'status-mengerjakan',
+      };
+    case 'keluar':
+      return {
+        title: '🟡 Keluar Aplikasi',
+        subtitle: `Tercatat: ${leaveCount || 1}/3`,
+        cssClass: 'status-keluar',
+      };
+    case 'terkunci':
+      return {
+        title: '🔴 Sesi Terkunci',
+        subtitle: 'Melanggar 3x!',
+        cssClass: 'status-terkunci',
+      };
+    case 'selesai':
+      return {
+        title: '🔵 Selesai Ujian',
+        subtitle: 'Terkirim',
+        cssClass: 'status-selesai',
+      };
+    default:
+      return {
+        title: '🟢 Mengerjakan',
+        subtitle: 'Fokus',
+        cssClass: 'status-mengerjakan',
+      };
+  }
+}
+
+// --- Modal Detail Logic ---
+function openModal(deviceId) {
+  const student = state.students.get(deviceId);
+  if (!student) return;
+
+  state.selectedStudentId = deviceId;
   updateModalData(student);
-  detailModal.classList.add('active');
+
+  telemetryModal.classList.add('active');
 }
 
 function updateModalData(s) {
-  modalStudentName.textContent = s.name || 'Siswa';
-  modalStudentClass.textContent = s.className || 'Kelas';
+  if (!s) return;
+
+  modalStudentName.textContent = s.name || 'Siswa Ujian';
+  modalStudentClass.textContent = s.className || 'X';
   modalDeviceLabel.textContent = s.deviceLabel || 'Android Device';
-  modalSubject.textContent = s.subject || 'Mapel Ujian';
+  modalSubject.textContent = s.subject || 'Ujian Sekolah';
 
-  // Status Banner
   const meta = getStatusMeta(s.status, s.leaveCount);
-  modalStatusBanner.className = `modal-status-banner ${meta.cssClass}`;
-  modalStatusText.innerHTML = meta.badgeHtml;
+  modalStatusBanner.className = `modal-live-status-banner ${meta.cssClass} lg-glass`;
+  modalStatusText.textContent = `${meta.title} (${meta.subtitle})`;
 
-  // Telemetry items
-  modalBattery.textContent = `${s.batteryLevel || 85}%`;
-  modalBatterySub.textContent = s.isCharging ? 'Sedang Mengisi Daya (Charging)' : 'Menggunakan Baterai (Discharging)';
+  // Battery
+  modalBattery.textContent = `${s.batteryLevel || 100}%`;
+  modalBatterySub.textContent = s.isCharging ? '⚡ Sedang Mengecas' : 'Menggunakan Daya Baterai';
 
-  modalNetwork.textContent = s.network || 'Wi-Fi';
+  // Network & Ping
+  modalNetwork.textContent = s.network || 'Wi-Fi Sekolah';
   modalPing.textContent = `${s.pingMs || 9} ms`;
+
+  // Temperature
   modalTemperature.textContent = `${s.temperature || 36.5}°C`;
 
-  // Remote Unlock Button visibility (only for locked sessions)
-  if (s.status === 'terkunci') {
+  // Timeline Logs
+  const logs = s.violationLogs || [];
+  if (logs.length === 0) {
+    modalTimelineLogs.innerHTML = `
+      <div class="timeline-row">
+        <span class="tl-time">${new Date().toLocaleTimeString('id-ID')}</span>
+        <span class="tl-text">Siswa fokus di layar ujian tanpa pelanggaran.</span>
+      </div>
+    `;
+  } else {
+    modalTimelineLogs.innerHTML = logs
+      .slice()
+      .reverse()
+      .map((item) => {
+        const time = new Date(item.timestamp).toLocaleTimeString('id-ID');
+        const isViolation = item.text.includes('Keluar') || item.text.includes('terkunci') || item.text.includes('Pelanggaran');
+        return `
+          <div class="timeline-row">
+            <span class="tl-time">${time}</span>
+            <span class="tl-text ${isViolation ? 'tl-danger' : ''}">${escapeHtml(item.text)}</span>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  // Show remote unlock button if locked or in warning state
+  if (s.status === 'terkunci' || (s.status === 'keluar' && (s.leaveCount || 0) >= 2)) {
     remoteUnlockBtn.style.display = 'inline-flex';
   } else {
     remoteUnlockBtn.style.display = 'none';
   }
-
-  // Violation Timeline
-  modalTimeline.innerHTML = '';
-  const logs = s.violationLogs || [];
-  if (logs.length === 0) {
-    modalTimeline.innerHTML = `
-      <div class="timeline-event">
-        <span class="timeline-time">${new Date(s.startTime || Date.now()).toLocaleTimeString('id-ID')}</span>
-        <span class="timeline-text">Sesi ujian dimulai secara tertib</span>
-      </div>
-    `;
-  } else {
-    logs.slice(-6).reverse().forEach((log) => {
-      const timeStr = new Date(log.timestamp || Date.now()).toLocaleTimeString('id-ID');
-      const isViolate = (log.text || '').toLowerCase().includes('keluar') || (log.text || '').toLowerCase().includes('terkunci');
-      const item = document.createElement('div');
-      item.className = `timeline-event ${isViolate ? 'event-violation' : ''}`;
-      item.innerHTML = `
-        <span class="timeline-time">${timeStr}</span>
-        <span class="timeline-text">${escapeHtml(log.text)}</span>
-      `;
-      modalTimeline.appendChild(item);
-    });
-  }
 }
 
 function closeModal() {
-  detailModal.classList.remove('active');
+  telemetryModal.classList.remove('active');
   state.selectedStudentId = null;
 }
 
-// Utility: escape HTML
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
+// --- Violations Tab Logic ---
+function updateViolationsTab() {
+  if (!violationsList) return;
+
+  const violators = Array.from(state.students.values()).filter(
+    (s) => s.status === 'terkunci' || s.status === 'keluar' || (s.violationLogs && s.violationLogs.length > 1)
+  );
+
+  if (violators.length === 0) {
+    violationsList.innerHTML = `
+      <div class="empty-glass-state lg-glass">
+        <div class="empty-title">Tidak Ada Pelanggaran Aktif</div>
+        <div class="empty-text">Semua siswa sedang fokus mengerjakan ujian dengan tertib.</div>
+      </div>
+    `;
+    return;
+  }
+
+  violationsList.innerHTML = violators.map((s) => {
+    const isLocked = s.status === 'terkunci';
+    return `
+      <div class="violation-card-row lg-glass">
+        <div class="v-lead">
+          <div class="v-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div>
+            <div class="v-name">${escapeHtml(s.name)} · <span class="tag-status-val">${escapeHtml(s.className)}</span></div>
+            <div class="v-desc">${isLocked ? '🔴 Sesi Terkunci - Melanggar 3x keluar aplikasi' : `🟡 Terdeteksi keluar aplikasi (${s.leaveCount}/3 kali)`}</div>
+          </div>
+        </div>
+        <div class="v-time">Perangkat: ${escapeHtml(s.deviceLabel)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// --- Stats Tab Logic ---
+function updateStatsTab() {
+  const all = Array.from(state.students.values());
+  const total = all.length;
+
+  if (total === 0) {
+    if (integrityRate) integrityRate.textContent = '100%';
+    if (wifiCount) wifiCount.textContent = '0 Siswa';
+    if (lowBatteryCount) lowBatteryCount.textContent = '0 Siswa';
+    return;
+  }
+
+  const compliant = all.filter((s) => s.status === 'mengerjakan' || s.status === 'selesai').length;
+  const rate = Math.round((compliant / total) * 100);
+  const lowBat = all.filter((s) => (s.batteryLevel || 100) < 20).length;
+
+  if (integrityRate) integrityRate.textContent = `${rate}%`;
+  if (wifiCount) wifiCount.textContent = `${total} Siswa`;
+  if (lowBatteryCount) lowBatteryCount.textContent = `${lowBat} Siswa`;
+}
+
+// --- Utility: Escape HTML ---
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/'/g, '&#039;');
 }
