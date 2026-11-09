@@ -22,6 +22,7 @@ const ADMIN_PASS = 'rick';
 let staffUsers = [
   {
     id: 'DEV-001',
+    nsid: 'NSID-DEV-0001',
     username: 'rick',
     name: 'Rick Sanchez (Developer Root)',
     nip: 'DEV-ROOT-001',
@@ -35,6 +36,7 @@ let staffUsers = [
   },
   {
     id: 'ADM-101',
+    nsid: 'NSID-202611-0081',
     username: 'hendra.gunawan',
     name: 'Drs. Hendra Gunawan, M.Pd',
     nip: '19790514 200501 1 008',
@@ -48,6 +50,7 @@ let staffUsers = [
   },
   {
     id: 'PRK-201',
+    nsid: 'NSID-202611-0192',
     username: 'siti.nurhaliza',
     name: 'Siti Nurhaliza, S.Kom',
     nip: '19850320 200902 2 004',
@@ -61,6 +64,7 @@ let staffUsers = [
   },
   {
     id: 'PRK-202',
+    nsid: 'NSID-202611-0243',
     username: 'doni.pratama',
     name: 'Doni Pratama, S.T',
     nip: '19940115 201903 1 007',
@@ -74,6 +78,7 @@ let staffUsers = [
   },
   {
     id: 'GRU-301',
+    nsid: 'NSID-202611-0315',
     username: 'budi.santoso',
     name: 'Budi Santoso, S.Pd',
     nip: '19821105 200801 1 012',
@@ -87,6 +92,7 @@ let staffUsers = [
   },
   {
     id: 'GRU-302',
+    nsid: 'NSID-202611-0388',
     username: 'dewi.lestari',
     name: 'Dewi Lestari, M.Si',
     nip: '19880719 201101 2 009',
@@ -100,6 +106,7 @@ let staffUsers = [
   },
   {
     id: 'GRU-303',
+    nsid: 'NSID-202611-0412',
     username: 'ahmad.fauzi',
     name: 'Ahmad Fauzi, S.Pd',
     nip: '19910412 201502 1 003',
@@ -113,6 +120,7 @@ let staffUsers = [
   },
   {
     id: 'GRU-304',
+    nsid: 'NSID-202611-0467',
     username: 'rina.agustina',
     name: 'Rina Agustina, S.Pd',
     nip: '19890928 201403 2 006',
@@ -126,6 +134,7 @@ let staffUsers = [
   },
   {
     id: 'GRU-305',
+    nsid: 'NSID-202611-0520',
     username: 'hartono.pai',
     name: 'Drs. H. Hartono, M.Ag',
     nip: '19750208 200212 1 002',
@@ -143,6 +152,11 @@ let staffUsers = [
 const activeTokens = new Set();
 const students = new Map(); // key: deviceId, value: StudentData
 const sseClients = new Set(); // SSE connected response streams
+
+// Realtime Announcement Broadcasts (Per-student or Mass All-Students)
+// activeBroadcast: { id, title, message, target: 'all' | deviceId, timestamp, expiresAt }
+let activeBroadcast = null;
+const studentBroadcasts = new Map(); // key: deviceId, value: broadcastObj
 
 // Simulator state
 let simulatorInterval = null;
@@ -221,8 +235,8 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
-// HTTP Server
-const server = http.createServer(async (req, res) => {
+// HTTP Server & Serverless Request Handler
+async function requestHandler(req, res) {
   const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = urlObj.pathname;
 
@@ -311,12 +325,34 @@ const server = http.createServer(async (req, res) => {
     existing.pingMs = data.pingMs || Math.floor(Math.random() * 12 + 6);
     existing.lastSeen = now;
 
+    // Check if remote unlock was issued for this student
+    let shouldUnlock = false;
+    if (existing.unlockRequested) {
+      shouldUnlock = true;
+      existing.unlockRequested = false;
+      existing.status = 'mengerjakan';
+      existing.leaveCount = 0;
+    }
+
     students.set(deviceId, existing);
 
     // Broadcast updated student to dashboard
     broadcast({ type: 'STUDENT_UPDATE', student: existing });
 
-    return sendJson(res, 200, { success: true });
+    // Determine pending broadcast for this student (targeted has higher priority than mass)
+    let pendingBroadcast = null;
+    const targeted = studentBroadcasts.get(deviceId);
+    if (targeted && targeted.expiresAt > now) {
+      pendingBroadcast = targeted;
+    } else if (activeBroadcast && activeBroadcast.expiresAt > now) {
+      pendingBroadcast = activeBroadcast;
+    }
+
+    return sendJson(res, 200, {
+      success: true,
+      shouldUnlock,
+      broadcast: pendingBroadcast,
+    });
   }
 
   // 4. Get active students list
@@ -333,6 +369,7 @@ const server = http.createServer(async (req, res) => {
     if (s) {
       s.status = 'mengerjakan';
       s.leaveCount = 0;
+      s.unlockRequested = true; // Signal APK to immediately unlock on next heartbeat
       s.violationLogs.push({
         timestamp: Date.now(),
         text: 'Sesi dibuka kembali dari jarak jauh oleh Super-Admin'
@@ -341,6 +378,64 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { success: true });
     }
     return sendJson(res, 404, { error: 'Siswa tidak ditemukan' });
+  }
+
+  // 5b. Realtime Broadcast Command (Single Student or Mass All Students)
+  if (pathname === '/api/broadcast' && req.method === 'POST') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    const { target, title, message, durationSeconds } = await parseBody(req);
+    if (!message || !message.trim()) {
+      return sendJson(res, 400, { error: 'Pesan siaran tidak boleh kosong!' });
+    }
+
+    const duration = (durationSeconds && Number(durationSeconds) > 0) ? Number(durationSeconds) : 120;
+    const now = Date.now();
+    const isAll = !target || target === 'all';
+
+    const broadcastObj = {
+      id: 'BC-' + now,
+      title: (title || 'PENGUMUMAN PENGAWAS').trim(),
+      message: message.trim(),
+      target: isAll ? 'all' : target,
+      targetName: isAll ? 'Semua Siswa' : (students.get(target)?.name || target),
+      timestamp: now,
+      expiresAt: now + (duration * 1000),
+    };
+
+    if (isAll) {
+      activeBroadcast = broadcastObj;
+    } else {
+      studentBroadcasts.set(target, broadcastObj);
+    }
+
+    // Push realtime event to all connected dashboards
+    broadcast({ type: 'BROADCAST_SENT', broadcast: broadcastObj });
+
+    return sendJson(res, 200, {
+      success: true,
+      broadcast: broadcastObj,
+      message: `Siaran berhasil dikirim ke ${broadcastObj.targetName}`
+    });
+  }
+
+  // 5c. Get Active Broadcasts
+  if (pathname === '/api/broadcast' && req.method === 'GET') {
+    const now = Date.now();
+    const liveActive = (activeBroadcast && activeBroadcast.expiresAt > now) ? activeBroadcast : null;
+    return sendJson(res, 200, {
+      success: true,
+      activeBroadcast: liveActive,
+      studentBroadcastsCount: studentBroadcasts.size,
+    });
+  }
+
+  // 5d. Clear Active Broadcast
+  if (pathname === '/api/broadcast' && req.method === 'DELETE') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    activeBroadcast = null;
+    studentBroadcasts.clear();
+    broadcast({ type: 'BROADCAST_CLEARED' });
+    return sendJson(res, 200, { success: true, message: 'Semua siaran aktif telah dihentikan' });
   }
 
   // 6. Realtime Server-Sent Events (SSE) Stream
@@ -393,8 +488,13 @@ const server = http.createServer(async (req, res) => {
     if (!payload.name) return sendJson(res, 400, { error: 'Nama guru wajib diisi' });
     
     const newId = payload.id || `GRU-${String(staffUsers.length + 301).padStart(3, '0')}`;
+    const newNsid = (payload.nsid && payload.nsid.trim())
+      ? payload.nsid.trim()
+      : `NSID-202611-${String(staffUsers.length + 301).padStart(4, '0')}`;
+
     const newUser = {
       id: newId,
+      nsid: newNsid,
       username: (payload.username || payload.name.toLowerCase().replace(/[^a-z0-9]/g, '.')).slice(0, 20),
       name: payload.name,
       nip: payload.nip || '-',
@@ -467,7 +567,7 @@ const server = http.createServer(async (req, res) => {
       res.end(content);
     });
   });
-});
+}
 
 // Built-in Simulator for Instant Demo
 function startSimulator() {
@@ -539,11 +639,17 @@ function stopSimulator() {
   broadcast({ type: 'SYNC_STUDENTS', students: Array.from(students.values()) });
 }
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n======================================================`);
-  console.log(` 🚀 UjianKita Realtime Monitor Server Active!`);
-  console.log(` 🌐 Dashboard URL: http://localhost:${PORT}`);
-  console.log(` 🔑 Super-Admin:   rick / rick`);
-  console.log(` 📡 Telemetry API: http://localhost:${PORT}/api/telemetry`);
-  console.log(`======================================================\n`);
-});
+const server = http.createServer(requestHandler);
+
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n======================================================`);
+    console.log(` 🚀 UjianKita Realtime Monitor Server Active!`);
+    console.log(` 🌐 Dashboard URL: http://localhost:${PORT}`);
+    console.log(` 🔑 Super-Admin:   rick / rick`);
+    console.log(` 📡 Telemetry API: http://localhost:${PORT}/api/telemetry`);
+    console.log(`======================================================\n`);
+  });
+}
+
+module.exports = requestHandler;

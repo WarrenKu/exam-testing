@@ -142,11 +142,24 @@ export default function App() {
   const [newTeacher, setNewTeacher] = useState({
     name: '',
     nip: '',
+    nsid: '',
     role: 'Guru Pengawas',
     subject: '',
     room: 'Ruang 01',
     status: 'Aktif',
   });
+
+  // Realtime Broadcast State (Siaran Pengumuman Massal & Per-Siswa)
+  const [activeBroadcast, setActiveBroadcast] = useState(null);
+  const [showBroadcastAllModal, setShowBroadcastAllModal] = useState(false);
+  const [broadcastAllForm, setBroadcastAllForm] = useState({
+    title: 'PENGUMUMAN PENGAWAS',
+    message: '',
+    durationSeconds: 120,
+  });
+  const [studentBroadcastMsg, setStudentBroadcastMsg] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastFeedback, setBroadcastFeedback] = useState('');
 
   const eventSourceRef = useRef(null);
 
@@ -192,6 +205,14 @@ export default function App() {
               return [...prev, payload.student];
             }
           });
+        } else if (payload.type === 'BROADCAST_SENT' && payload.broadcast) {
+          setActiveBroadcast(payload.broadcast);
+          setBroadcastFeedback(`Siaran Terkirim: ${payload.broadcast.title}`);
+          setTimeout(() => setBroadcastFeedback(''), 5000);
+        } else if (payload.type === 'BROADCAST_CLEARED') {
+          setActiveBroadcast(null);
+          setBroadcastFeedback('Siaran aktif telah dihentikan');
+          setTimeout(() => setBroadcastFeedback(''), 4000);
         }
       } catch (err) {
         console.error('SSE error:', err);
@@ -213,6 +234,16 @@ export default function App() {
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => setStudents(data.students || []))
+      .catch(() => {});
+
+    // Fetch initial broadcast state
+    fetch('/api/broadcast', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        if (data.activeBroadcast) setActiveBroadcast(data.activeBroadcast);
+      })
       .catch(() => {});
 
     return () => {
@@ -374,6 +405,85 @@ export default function App() {
     }
   };
 
+  // Realtime Broadcast Handlers (Massal & Per-Siswa)
+  const handleSendBroadcastAll = async (e) => {
+    if (e) e.preventDefault();
+    if (!broadcastAllForm.message.trim()) return;
+    setSendingBroadcast(true);
+    try {
+      const res = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          target: 'all',
+          title: broadcastAllForm.title.trim() || 'PENGUMUMAN PENGAWAS',
+          message: broadcastAllForm.message.trim(),
+          durationSeconds: broadcastAllForm.durationSeconds || 120,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActiveBroadcast(data.broadcast);
+        setShowBroadcastAllModal(false);
+        setBroadcastFeedback('📢 Siaran massal berhasil dikirim ke seluruh siswa!');
+        setTimeout(() => setBroadcastFeedback(''), 5000);
+      }
+    } catch (err) {
+      console.error('Send broadcast all error:', err);
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const handleSendStudentBroadcast = async () => {
+    if (!selectedStudent || !studentBroadcastMsg.trim()) return;
+    setSendingBroadcast(true);
+    try {
+      const res = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          target: selectedStudent.deviceId,
+          title: 'PERINGATAN KHUSUS PENGAWAS',
+          message: studentBroadcastMsg.trim(),
+          durationSeconds: 120,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBroadcastFeedback(`Siaran berhasil dikirim ke ${selectedStudent.name}!`);
+        setStudentBroadcastMsg('');
+        setTimeout(() => setBroadcastFeedback(''), 4000);
+      }
+    } catch (err) {
+      console.error('Send student broadcast error:', err);
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const handleClearBroadcast = async () => {
+    try {
+      const res = await fetch('/api/broadcast', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setActiveBroadcast(null);
+        setBroadcastFeedback('Siaran aktif telah dihentikan');
+        setTimeout(() => setBroadcastFeedback(''), 4000);
+      }
+    } catch (err) {
+      console.error('Clear broadcast error:', err);
+    }
+  };
+
   // Copy endpoint handler
   const copyEndpoint = () => {
     const url = `http://${window.location.host}/api/telemetry`;
@@ -472,12 +582,13 @@ export default function App() {
         setNewTeacher({
           name: '',
           nip: '',
+          nsid: '',
           role: 'Guru Pengawas',
           subject: '',
           room: 'Ruang 01',
           status: 'Aktif',
         });
-        setTeacherNotification(`Akun guru baru "${data.teacher.name}" (ID: ${data.teacher.id}) berhasil ditambahkan ke sistem!`);
+        setTeacherNotification(`Akun guru baru "${data.teacher.name}" (NSID: ${data.teacher.nsid || data.teacher.id}) berhasil ditambahkan ke sistem!`);
       }
     } catch (err) {
       console.error('Create teacher error:', err);
@@ -533,6 +644,7 @@ export default function App() {
   // Shared Admin Menu Items (Used in Desktop topbar and Mobile bottom navbar)
   const adminMenuItems = useMemo(
     () => [
+      { label: 'Siaran Pengumuman Massal', icon: <Radio size={15} />, onSelect: () => setShowBroadcastAllModal(true) },
       { label: 'Refresh Data SSE', icon: <RefreshCw size={15} />, onSelect: connectSSE },
       { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
       { label: 'Ekspor Data CSV', icon: <Download size={15} />, onSelect: handleExportCSV },
@@ -918,6 +1030,27 @@ export default function App() {
                 </Panel>
               </div>
 
+              {/* Active Broadcast Notification Banner */}
+              {activeBroadcast && (
+                <div className="active-broadcast-alert">
+                  <div className="broadcast-alert-icon">
+                    <Radio size={18} />
+                  </div>
+                  <div className="broadcast-alert-content">
+                    <div className="broadcast-alert-title">
+                      <span>📢 SIARAN LANGSUNG AKTIF ({activeBroadcast.targetName || 'Semua Siswa'})</span>
+                      <span className="live-tag">LIVE</span>
+                    </div>
+                    <div className="broadcast-alert-text">
+                      <strong>{activeBroadcast.title}:</strong> {activeBroadcast.message}
+                    </div>
+                  </div>
+                  <button className="broadcast-stop-btn" onClick={handleClearBroadcast}>
+                    Hentikan Siaran
+                  </button>
+                </div>
+              )}
+
               {/* Quick Info Banners */}
               <div className="dashboard-double-cards">
                 <Panel isGlass={liquidGlassEnabled} className="banner-card">
@@ -955,6 +1088,10 @@ export default function App() {
                       Gunakan tombol berikut untuk kontrol massal sesi seluruh siswa:
                     </p>
                     <div className="quick-action-buttons">
+                      <button className="dashboard-action-btn" style={{ borderColor: 'rgba(56, 189, 248, 0.4)' }} onClick={() => setShowBroadcastAllModal(true)}>
+                        <Radio size={15} color="#38BDF8" />
+                        <span style={{ color: '#38BDF8', fontWeight: 600 }}>Siaran Pengumuman Massal</span>
+                      </button>
                       <button className="dashboard-action-btn" onClick={handleUnlockAll}>
                         <Unlock size={15} />
                         <span>Buka Kunci Semua Siswa</span>
@@ -1359,7 +1496,7 @@ export default function App() {
                 <table className="user-data-table">
                   <thead>
                     <tr>
-                      <th>User ID</th>
+                      <th>User ID & NSID</th>
                       <th>Nama Pengguna / Guru</th>
                       <th>Role / Peran</th>
                       <th>Mata Pelajaran / Tugas</th>
@@ -1390,12 +1527,15 @@ export default function App() {
 
                         return (
                           <tr key={t.id} className={isDev ? 'super-admin-row' : ''}>
-                            {/* User ID */}
+                            {/* User ID & NSID */}
                             <td>
                               <div className="code-font" style={{ fontWeight: 700, color: isDev ? '#34d399' : 'inherit' }}>
                                 {t.id}
                               </div>
-                              <div style={{ fontSize: 11, color: 'var(--text-concrete)' }}>
+                              <div className="nsid-tag-chip" title="Nomor Standar Identitas Guru">
+                                {t.nsid || `NSID-${t.id}`}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-concrete)', marginTop: 2 }}>
                                 @{t.username || t.id.toLowerCase()}
                               </div>
                             </td>
@@ -1797,6 +1937,60 @@ export default function App() {
               </div>
             )}
 
+            {/* Realtime Broadcast / Peringatan Langsung ke Siswa */}
+            <div className="modal-broadcast-section">
+              <div className="section-label-row">
+                <Radio size={14} color="#38BDF8" />
+                <span className="section-label">📢 Kirim Siaran Langsung ke Siswa Ini</span>
+              </div>
+              <div className="broadcast-preset-chips">
+                <button
+                  type="button"
+                  className="preset-chip"
+                  onClick={() => setStudentBroadcastMsg('Harap tetap fokus pada lembar soal dan jangan membuka aplikasi lain!')}
+                >
+                  Fokus Soal
+                </button>
+                <button
+                  type="button"
+                  className="preset-chip"
+                  onClick={() => setStudentBroadcastMsg('Peringatan Pengawas: Terdeteksi upaya berpindah jendela aplikasi!')}
+                >
+                  Peringatan Jendela
+                </button>
+                <button
+                  type="button"
+                  className="preset-chip"
+                  onClick={() => setStudentBroadcastMsg('Sisa waktu ujian 15 menit lagi. Periksa seluruh jawaban Anda.')}
+                >
+                  Sisa 15 Menit
+                </button>
+              </div>
+              <div className="broadcast-input-row">
+                <input
+                  type="text"
+                  className="broadcast-text-input"
+                  placeholder={`Ketik pesan siaran untuk ${selectedStudent.name}...`}
+                  value={studentBroadcastMsg}
+                  onChange={(e) => setStudentBroadcastMsg(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSendStudentBroadcast();
+                  }}
+                />
+                <button
+                  className="broadcast-send-btn"
+                  onClick={handleSendStudentBroadcast}
+                  disabled={!studentBroadcastMsg.trim() || sendingBroadcast}
+                >
+                  <Radio size={14} />
+                  <span>{sendingBroadcast ? 'Mengirim...' : 'Kirim Siaran'}</span>
+                </button>
+              </div>
+              <div className="broadcast-hint">
+                Pesan akan langsung tampil melayang di layar ujian HP siswa secara realtime tanpa menggeser formulir soal.
+              </div>
+            </div>
+
             <div className="modal-footer">
               {(selectedStudent.status === 'terkunci' || (selectedStudent.status === 'keluar' && (selectedStudent.leaveCount || 0) >= 2)) && (
                 <Button
@@ -1831,7 +2025,7 @@ export default function App() {
                 <div>
                   <div className="modal-name">{selectedTeacherForDetail.name}</div>
                   <div className="modal-sub">
-                    ID: {selectedTeacherForDetail.id} · NIP: {selectedTeacherForDetail.nip || '-'}
+                    ID: {selectedTeacherForDetail.id} · NSID: <strong style={{ color: '#38BDF8' }}>{selectedTeacherForDetail.nsid || selectedTeacherForDetail.id}</strong> · NIP: {selectedTeacherForDetail.nip || '-'}
                   </div>
                 </div>
               </div>
@@ -1911,6 +2105,10 @@ export default function App() {
 
             <div className="banner-card-body" style={{ background: 'rgba(24, 24, 27, 0.6)', padding: 14, borderRadius: 14, marginTop: 12 }}>
               <div className="info-stat-row">
+                <span>Nomor Standar Identitas (NSID)</span>
+                <strong className="code-font" style={{ color: '#38BDF8' }}>{selectedTeacherForDetail.nsid || selectedTeacherForDetail.id}</strong>
+              </div>
+              <div className="info-stat-row">
                 <span>Hak Otoritas & Akses</span>
                 <strong>{selectedTeacherForDetail.privilege || 'Presensi & Pengawasan Standar'}</strong>
               </div>
@@ -1985,6 +2183,15 @@ export default function App() {
               </div>
 
               <div className="form-group">
+                <label className="form-label">NSID (Nomor Standar Identitas Guru)</label>
+                <Input
+                  value={newTeacher.nsid || ''}
+                  onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, nsid: val }))}
+                  placeholder="Contoh: NSID-202611-0550 (Otomatis dibuat jika dikosongkan)"
+                />
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">NIP / NUPTK / Kode Guru</label>
                 <Input
                   value={newTeacher.nip}
@@ -2040,6 +2247,140 @@ export default function App() {
                 </button>
                 <Button variant="filled" tint="#10B981" type="submit">
                   Simpan Akun Guru
+                </Button>
+              </div>
+            </form>
+          </Panel>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: SIARAN PENGUMUMAN MASSAL KE SEMUA SISWA (BROADCAST ALL)       */}
+      {/* ===================================================================== */}
+      {showBroadcastAllModal && (
+        <div className="modal-backdrop" onClick={() => setShowBroadcastAllModal(false)}>
+          <Panel isGlass={liquidGlassEnabled} className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-identity">
+                  <div className="modal-name">📢 Siaran Pengumuman Massal (Broadcast All)</div>
+                </div>
+                <div className="modal-sub">
+                  Kirim pesan teks realtime ke SELURUH peserta ujian yang sedang aktif secara serentak.
+                </div>
+              </div>
+              <button
+                className="modal-close-btn"
+                onClick={() => setShowBroadcastAllModal(false)}
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="broadcast-live-preview-box">
+              <div className="preview-label">PRATINJAU TAMPILAN DI HP SISWA (MENGAMBANG TANPA MENGGESER SOAL):</div>
+              <div className="preview-banner-card">
+                <div className="preview-icon">📢</div>
+                <div className="preview-content">
+                  <div className="preview-title">
+                    <span>{broadcastAllForm.title || 'PENGUMUMAN PENGAWAS'}</span>
+                    <span className="live-tag">LIVE</span>
+                  </div>
+                  <div className="preview-msg">
+                    {broadcastAllForm.message || 'Ketik pesan siaran di bawah untuk melihat simulasi tampilan...'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSendBroadcastAll} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">Judul Siaran</label>
+                <Input
+                  value={broadcastAllForm.title}
+                  onValueChange={(val) => setBroadcastAllForm((prev) => ({ ...prev, title: val }))}
+                  placeholder="Contoh: PENGUMUMAN PENGAWAS"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Pesan Siaran untuk Seluruh Siswa</label>
+                <textarea
+                  className="broadcast-textarea"
+                  rows={3}
+                  value={broadcastAllForm.message}
+                  onChange={(e) => setBroadcastAllForm((prev) => ({ ...prev, message: e.target.value }))}
+                  placeholder="Ketik pengumuman penting yang harus dibaca oleh seluruh siswa..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Pilihan Cepat / Template Pengawas:</label>
+                <div className="broadcast-preset-chips">
+                  <button
+                    type="button"
+                    className="preset-chip"
+                    onClick={() => setBroadcastAllForm((prev) => ({ ...prev, message: 'Waktu ujian tersisa 15 menit lagi! Pastikan semua jawaban telah diisi.' }))}
+                  >
+                    ⏳ Sisa 15 Menit
+                  </button>
+                  <button
+                    type="button"
+                    className="preset-chip"
+                    onClick={() => setBroadcastAllForm((prev) => ({ ...prev, message: 'Dilarang keras keluar dari aplikasi ujian atau sesi Anda akan langsung terkunci!' }))}
+                  >
+                    ⚠️ Peringatan Jangan Keluar
+                  </button>
+                  <button
+                    type="button"
+                    className="preset-chip"
+                    onClick={() => setBroadcastAllForm((prev) => ({ ...prev, message: 'Waktu ujian telah berakhir. Silakan segera tekan tombol Submit / Kirim formulir!' }))}
+                  >
+                    🛑 Waktu Ujian Selesai
+                  </button>
+                  <button
+                    type="button"
+                    className="preset-chip"
+                    onClick={() => setBroadcastAllForm((prev) => ({ ...prev, message: 'Pengawas sedang memeriksa ruangan. Harap tenang dan fokus pada layar masing-masing.' }))}
+                  >
+                    👮 Pengecekan Ruang
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Durasi Tampil di Layar Siswa</label>
+                <select
+                  className="form-select-input"
+                  value={broadcastAllForm.durationSeconds}
+                  onChange={(e) => setBroadcastAllForm((prev) => ({ ...prev, durationSeconds: Number(e.target.value) }))}
+                >
+                  <option value={30}>30 Detik</option>
+                  <option value={60}>1 Menit</option>
+                  <option value={120}>2 Menit (Standar)</option>
+                  <option value={300}>5 Menit</option>
+                </select>
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: 10 }}>
+                {activeBroadcast && (
+                  <button
+                    type="button"
+                    className="ui-action-btn"
+                    style={{ borderColor: 'rgba(239, 68, 68, 0.5)', color: '#EF4444' }}
+                    onClick={handleClearBroadcast}
+                  >
+                    Hentikan Siaran Aktif
+                  </button>
+                )}
+                <button className="ui-action-btn" type="button" onClick={() => setShowBroadcastAllModal(false)}>
+                  Batal
+                </button>
+                <Button variant="filled" tint="#0284C7" type="submit" disabled={!broadcastAllForm.message.trim() || sendingBroadcast}>
+                  {sendingBroadcast ? 'Mengirim Siaran...' : '🚀 Siarkan ke Semua Siswa'}
                 </Button>
               </div>
             </form>

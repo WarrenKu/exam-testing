@@ -1892,6 +1892,9 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   String? _webError;
   Timer? _telemetryTimer;
   String _deviceId = '';
+  String? _activeBroadcastMessage;
+  String? _activeBroadcastTitle;
+  Timer? _broadcastDismissTimer;
 
   Future<void> _sendTelemetry({String? overrideStatus, int? overrideLeaveCount}) async {
     try {
@@ -1921,13 +1924,51 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
       };
 
       final uri = Uri.parse('$serverUrl/api/telemetry');
-      await http
+      final res = await http
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 2));
+
+      if (res.statusCode == 200 && mounted) {
+        final data = jsonDecode(res.body);
+        if (data is Map<String, dynamic>) {
+          // 1. Remote Unlock command from Super-Admin
+          if (data['shouldUnlock'] == true && _locked) {
+            setState(() {
+              _locked = false;
+              _leaveCount = 0;
+            });
+          }
+
+          // 2. Realtime Broadcast announcement from Super-Admin / Teacher
+          if (data['broadcast'] != null && data['broadcast'] is Map<String, dynamic>) {
+            final b = data['broadcast'] as Map<String, dynamic>;
+            final bMsg = (b['message'] as String? ?? '').trim();
+            final bTitle = (b['title'] as String? ?? 'PENGUMUMAN PENGAWAS').trim();
+
+            if (bMsg.isNotEmpty && bMsg != _activeBroadcastMessage) {
+              _broadcastDismissTimer?.cancel();
+              setState(() {
+                _activeBroadcastMessage = bMsg;
+                _activeBroadcastTitle = bTitle;
+              });
+
+              // Auto dismiss floating overlay after 20 seconds
+              _broadcastDismissTimer = Timer(const Duration(seconds: 20), () {
+                if (mounted) {
+                  setState(() {
+                    _activeBroadcastMessage = null;
+                    _activeBroadcastTitle = null;
+                  });
+                }
+              });
+            }
+          }
+        }
+      }
     } catch (_) {}
   }
 
@@ -2017,6 +2058,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   @override
   void dispose() {
     _telemetryTimer?.cancel();
+    _broadcastDismissTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_setScreenSecurity(false));
     if (widget.devKioskPinning) {
@@ -2197,6 +2239,120 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                   ),
               ],
             ),
+            // Floating Realtime Announcement Overlay (TIDAK MENGGESER SOAL / OVERLAY DI ATAS WEBVIEW)
+            if (_activeBroadcastMessage != null)
+              Positioned(
+                top: 10,
+                left: 14,
+                right: 14,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFF38BDF8),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.35),
+                          blurRadius: 18,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.22),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.campaign_rounded,
+                            color: Color(0xFF38BDF8),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    _activeBroadcastTitle ?? 'PENGUMUMAN PENGAWAS',
+                                    style: const TextStyle(
+                                      color: Color(0xFF38BDF8),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'LIVE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _activeBroadcastMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () {
+                            _broadcastDismissTimer?.cancel();
+                            setState(() {
+                              _activeBroadcastMessage = null;
+                              _activeBroadcastTitle = null;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: Colors.white.withValues(alpha: 0.7),
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             if (!_locked && _webError == null)
               Positioned(
                 bottom: 16,
