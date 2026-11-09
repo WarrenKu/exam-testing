@@ -19,7 +19,7 @@ const ADMIN_PASS = 'rick';
 
 // Google Spreadsheet Integration (Option 2)
 // Student app & teachers data sheet
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '1mMANbRElvGLNAViBzOqY1UND5CY8wR6WNQRg1lpSKb0';
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '1yduCuweKpzd1GT967C9y-b3FLgRo-0VncdSOmzOoxjs';
 const GOOGLE_SHEET_TAB = process.env.GOOGLE_SHEET_TAB || 'Data_Guru';
 const GOOGLE_SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(GOOGLE_SHEET_TAB)}`;
 
@@ -110,9 +110,19 @@ function parseCsv(text) {
     return cells;
   };
 
-  const header = parseRow(lines[0]).map((h) => h.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+  // Dynamically detect header row (handles title/banner rows at top of sheet)
+  let headerLineIndex = 0;
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    const r = parseRow(lines[i]).map(c => c.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+    if (r.some(c => c.includes('KODE') || c.includes('NAMA') || c.includes('MAPEL'))) {
+      headerLineIndex = i;
+      break;
+    }
+  }
+
+  const header = parseRow(lines[headerLineIndex]).map((h) => h.toUpperCase().replace(/[^A-Z0-9]/g, ''));
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerLineIndex + 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
     const cells = parseRow(lines[i]);
     const obj = {};
