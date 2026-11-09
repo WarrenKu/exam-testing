@@ -1808,35 +1808,51 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  width: calc(100% - 24px);
-  max-width: 440px;
+  width: auto;
+  max-width: calc(100% - 16px);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 10px;
   box-sizing: border-box;
 }
 
-/* Capsule Nav Bar (Left Main Pill) */
-.mobile-nav-capsule {
-  flex: 1;
-  min-width: 0;
-  height: 58px;
+/* 1. KELVIN ZHANG GLISSE TABBAR (LIQUID MODE - ANIMASI TARIK & SPRING FLUID) */
+.mobile-glisse-tabbar-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.liquid-mode .lg-tab-bar[data-icons] {
+  --lg-tab-width: 72px;
+  --lg-tab-height: 54px;
+  --lg-tab-selected: #38BDF8;
+  --lg-fill: #38BDF8;
+  border-radius: 9999px;
+  background: rgba(22, 22, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.liquid-mode .lg-tab-bar[data-icons] .lg-tab-copy {
+  color: #38BDF8 !important;
+  font-weight: 700 !important;
+}
+
+/* 2. STANDARD CAPSULE (STANDARD MODE - RINGAN & SMOOTH TANPA GPU LAG) */
+.mobile-nav-capsule.standard-capsule {
+  width: 290px;
+  height: 54px;
   border-radius: 9999px;
   background: #141416;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #28282b;
   display: flex;
   align-items: center;
   padding: 4px;
   box-sizing: border-box;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.liquid-mode .mobile-nav-capsule {
-  background: rgba(22, 22, 26, 0.88);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  flex-shrink: 0;
 }
 
 /* Tab Item (Evenly distributed across the capsule, flex: 1) */
@@ -1914,8 +1930,8 @@ body {
 }
 
 .mobile-companion-action .lg-menu > button {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: #141416;
   border: 1px solid rgba(255, 255, 255, 0.12);

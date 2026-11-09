@@ -1790,47 +1790,65 @@ export default function App() {
       </div>
 
       {/* ===================================================================== */}
-      {/* MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU (Sesuai Gambar 2)         */}
+      {/* MOBILE (ANDROID) BOTTOM NAVBAR & ACTION MENU                           */}
       {/* ===================================================================== */}
       {isMobile && (
         <div className="mobile-bottom-nav-container">
-          <div className="mobile-nav-capsule">
-            <button
-              type="button"
-              className={`capsule-tab-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dashboard')}
-            >
-              <LayoutDashboard size={20} className="tab-icon" />
-              <span className="tab-label">Home</span>
-            </button>
+          {liquidGlassEnabled ? (
+            /* MODE LIQUID GLASS: Kelvin Zhang Glisse TabBar Asli (Animasi Tarik & Spring Physics) */
+            <div className="mobile-glisse-tabbar-wrap">
+              <TabBar
+                aria-label="Navigasi UjianKita Android"
+                value={activeTab === 'account' ? 'users' : activeTab}
+                onValueChange={(val) => val && setActiveTab(val)}
+                items={[
+                  { value: 'dashboard', label: 'Home', icon: <LayoutDashboard size={20} /> },
+                  { value: 'monitoring', label: 'Monitoring', icon: <Monitor size={20} /> },
+                  { value: 'status', label: 'Status API', icon: <Activity size={20} /> },
+                  { value: 'users', label: 'Akun', icon: <ShieldCheck size={20} /> },
+                ]}
+              />
+            </div>
+          ) : (
+            /* MODE STANDAR: UI Standar Halus & Ringan untuk Device Biasa (Tanpa GPU Lag) */
+            <div className="mobile-nav-capsule standard-capsule">
+              <button
+                type="button"
+                className={`capsule-tab-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setActiveTab('dashboard')}
+              >
+                <LayoutDashboard size={20} className="tab-icon" />
+                <span className="tab-label">Home</span>
+              </button>
 
-            <button
-              type="button"
-              className={`capsule-tab-item ${activeTab === 'monitoring' ? 'active' : ''}`}
-              onClick={() => setActiveTab('monitoring')}
-            >
-              <Monitor size={20} className="tab-icon" />
-              <span className="tab-label">Monitoring</span>
-            </button>
+              <button
+                type="button"
+                className={`capsule-tab-item ${activeTab === 'monitoring' ? 'active' : ''}`}
+                onClick={() => setActiveTab('monitoring')}
+              >
+                <Monitor size={20} className="tab-icon" />
+                <span className="tab-label">Monitoring</span>
+              </button>
 
-            <button
-              type="button"
-              className={`capsule-tab-item ${activeTab === 'status' ? 'active' : ''}`}
-              onClick={() => setActiveTab('status')}
-            >
-              <Activity size={20} className="tab-icon" />
-              <span className="tab-label">Status API</span>
-            </button>
+              <button
+                type="button"
+                className={`capsule-tab-item ${activeTab === 'status' ? 'active' : ''}`}
+                onClick={() => setActiveTab('status')}
+              >
+                <Activity size={20} className="tab-icon" />
+                <span className="tab-label">Status API</span>
+              </button>
 
-            <button
-              type="button"
-              className={`capsule-tab-item ${activeTab === 'users' || activeTab === 'account' ? 'active' : ''}`}
-              onClick={() => setActiveTab('users')}
-            >
-              <ShieldCheck size={20} className="tab-icon" />
-              <span className="tab-label">Akun</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                className={`capsule-tab-item ${activeTab === 'users' || activeTab === 'account' ? 'active' : ''}`}
+                onClick={() => setActiveTab('users')}
+              >
+                <ShieldCheck size={20} className="tab-icon" />
+                <span className="tab-label">Akun</span>
+              </button>
+            </div>
+          )}
 
           {/* Tombol Companion Aksi Bulat di Samping Kapsul (Persis Gambar 2) */}
           <div className="mobile-companion-action">
