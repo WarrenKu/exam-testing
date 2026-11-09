@@ -118,7 +118,7 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [simulatorRunning, setSimulatorRunning] = useState(false);
   const [liquidGlassEnabled, setLiquidGlassEnabled] = useState(
-    () => localStorage.getItem('ujiankita_liquid_glass') !== 'false'
+    () => localStorage.getItem('ujiankita_liquid_glasses') === 'true'
   );
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(
     () => localStorage.getItem('ujiankita_sound_alert') === 'true'
@@ -170,9 +170,9 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Persist Liquid Glass preference
+  // Persist Liquid Glasses preference (Default OFF)
   useEffect(() => {
-    localStorage.setItem('ujiankita_liquid_glass', liquidGlassEnabled ? 'true' : 'false');
+    localStorage.setItem('ujiankita_liquid_glasses', liquidGlassEnabled ? 'true' : 'false');
   }, [liquidGlassEnabled]);
 
   // Persist Sound Alert preference
@@ -738,8 +738,8 @@ export default function App() {
   // =========================================================================
   if (!token) {
     return (
-      <div className="login-screen">
-        <div className="login-ambient-glow"></div>
+      <div className={`login-screen ${liquidGlassEnabled ? 'liquid-mode' : 'standard-mode'}`}>
+        {liquidGlassEnabled && <div className="login-ambient-glow"></div>}
         <Panel isGlass={liquidGlassEnabled} className="login-card">
           <div className="login-head">
             {/* Logo Emblem UjianKita */}
@@ -1103,8 +1103,8 @@ export default function App() {
                       <strong>18 Detik Tanpa Heartbeat</strong>
                     </div>
                     <div className="info-stat-row">
-                      <span>Pengalaman UI</span>
-                      <strong>{liquidGlassEnabled ? 'Liquid Glass (Apple iOS)' : 'Standar (Modern Graphite)'}</strong>
+                      <span>Antarmuka UI</span>
+                      <strong>{liquidGlassEnabled ? 'Liquid Glasses (Apple iOS)' : 'Standar (Modern Graphite)'}</strong>
                     </div>
                   </div>
                 </Panel>
@@ -1753,18 +1753,18 @@ export default function App() {
               </div>
 
               <Panel isGlass={liquidGlassEnabled} className="settings-card">
-                {/* 1. TOGGLE LIQUID GLASS vs STANDAR */}
+                {/* 1. TOGGLE LIQUID GLASSES vs STANDAR */}
                 <div className="setting-row">
                   <div className="setting-info">
-                    <h4>Pengalaman Tampilan (Liquid Glass vs Standar)</h4>
+                    <h4>Liquid Glasses</h4>
                     <p>
                       {liquidGlassEnabled
-                        ? '🟢 Mode Liquid Glass Aktif: Menggunakan refraksi kaca cair, blur translusen, dan fisika spring Apple iOS.'
-                        : '⚪ Mode Standar Aktif: Menggunakan tombol datar modern (Solid Graphite Flat) tanpa efek kaca.'}
+                        ? '🟢 Mode Liquid Glasses Aktif: Menggunakan refraksi kaca cair, blur translusen, dan fisika spring Apple iOS.'
+                        : '⚪ Mode Standar Aktif: Antarmuka standar normal, solid graphite tanpa efek kaca atau blur pada menu dan toggle.'}
                     </p>
                   </div>
                   <Switch
-                    aria-label="Toggle Liquid Glass vs Standar"
+                    aria-label="Toggle Liquid Glasses"
                     checked={liquidGlassEnabled}
                     onCheckedChange={setLiquidGlassEnabled}
                   />

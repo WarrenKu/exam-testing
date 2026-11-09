@@ -561,7 +561,7 @@ body {
   background: rgba(60, 60, 60, 0.8);
 }
 
-/* STRICT STANDARD MODE: Strip ALL liquid glass from everything */
+/* STRICT STANDARD MODE: Strip ALL liquid glass from everything when OFF */
 .standard-mode,
 .standard-mode * {
   backdrop-filter: none !important;
@@ -572,6 +572,7 @@ body {
   background-image: none !important;
 }
 
+/* 1. Standard Panels & Cards (Clean solid graphite dark surface) */
 .standard-mode .standard-panel,
 .standard-mode .stat-card,
 .standard-mode .banner-card,
@@ -589,20 +590,161 @@ body {
   background: #141416 !important;
   border: 1px solid #28282b !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
-}
-
-.standard-mode .lg-button,
-.standard-mode button.lg-button,
-.standard-mode [data-variant="glass"],
-.standard-mode .lg-switch,
-.standard-mode .lg-tabbar,
-.standard-mode .lg-segmented-control,
-.standard-mode .topbar-demo-switch,
-.standard-mode .admin-avatar-pill {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
+/* 2. Standard Topbar & Avatar Pill */
+.standard-mode .admin-topbar {
+  background: #0d0d0f !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid #28282b !important;
+}
+
+.standard-mode .topbar-demo-switch,
+.standard-mode .admin-avatar-pill {
+  background: #18181b !important;
+  border: 1px solid #28282b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 3. Standard Switch / Toggle (Standard crisp flat toggle, zero glass, zero blur lens) */
+.standard-mode .lg-switch {
+  width: 50px !important;
+  height: 28px !important;
+  background: #27272a !important;
+  border-radius: 9999px !important;
+  border: 1px solid #3f3f46 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease !important;
+  overflow: visible !important;
+}
+
+.standard-mode .lg-switch[aria-checked="true"] {
+  background: #10B981 !important;
+  border-color: #10B981 !important;
+}
+
+.standard-mode .lg-switch-bed,
+.standard-mode .lg-switch-track,
+.standard-mode .lg-switch-fill,
+.standard-mode .lg-switch-inset {
+  display: none !important;
+}
+
+.standard-mode .lg-switch-thumb {
+  position: absolute !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background: #FFFFFF !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45) !important;
+  transform: none !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.standard-mode .lg-switch[aria-checked="true"] .lg-switch-thumb {
+  transform: translateX(22px) !important;
+}
+
+/* 4. Standard Menu Popovers (Clean solid dark menu, zero glass / zero blur) */
+.standard-mode .lg-menu-card {
+  background: #18181b !important;
+  border: 1px solid #2e2e33 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.standard-mode .lg-menu-surface,
+.standard-mode .lg-menu-card::after {
+  display: none !important;
+}
+
+.standard-mode .lg-menu-content {
+  position: relative !important;
+  z-index: 2 !important;
+  background: transparent !important;
+}
+
+.standard-mode .lg-menu-item {
+  color: #F0EFEA !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  transition: all 0.15s ease !important;
+}
+
+.standard-mode .lg-menu-item:hover,
+.standard-mode .lg-menu-item:focus-visible {
+  background: #27272a !important;
+  color: #38BDF8 !important;
+}
+
+.standard-mode .topbar-menu-wrapper .lg-menu > button {
+  background: #141416 !important;
+  border: 1px solid #28282b !important;
+  color: #F0EFEA !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.standard-mode .topbar-menu-wrapper .lg-menu > button:hover {
+  background: #222226 !important;
+  border-color: #38BDF8 !important;
+}
+
+/* 5. Standard Mobile Bottom Capsule & Companion Circle */
+.standard-mode .mobile-nav-capsule {
+  background: #141416 !important;
+  border: 1px solid #28282b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+.standard-mode .capsule-tab-item.active {
+  background: #25252a !important;
+  box-shadow: none !important;
+}
+
+.standard-mode .mobile-companion-action .lg-menu > button {
+  background: #141416 !important;
+  border: 1px solid #28282b !important;
+  color: #F0EFEA !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+.standard-mode .mobile-companion-action .lg-menu-card {
+  background: #18181b !important;
+  border: 1px solid #2e2e33 !important;
+  border-radius: 18px !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* 6. Standard Modal & Backdrop */
+.standard-mode .modal-backdrop {
+  background: rgba(0, 0, 0, 0.82) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 7. Standard Buttons & Variants */
 .standard-mode .lg-button,
 .standard-mode button.lg-button,
 .standard-mode [data-variant="glass"] {
@@ -1726,8 +1868,13 @@ body {
   box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.8) !important;
   border: 1px solid rgba(240, 239, 234, 0.18) !important;
   border-radius: 20px !important;
+  background: #18181b !important;
+}
+
+.liquid-mode .mobile-companion-action .lg-menu-card {
   background: rgba(20, 20, 24, 0.95) !important;
   backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
 }
 
 /* ==========================================================================
