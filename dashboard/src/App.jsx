@@ -125,8 +125,8 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   // Login form state
-  const [loginUser, setLoginUser] = useState('rick');
-  const [loginPass, setLoginPass] = useState('rick');
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
 
   // Teachers & Staff Users State (User ID)
@@ -835,11 +835,11 @@ export default function App() {
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="form-group">
-              <label className="form-label">Username</label>
+              <label className="form-label">Kode Guru / Username</label>
               <Input
                 value={loginUser}
                 onValueChange={setLoginUser}
-                placeholder="Masukkan username petugas"
+                placeholder="Cth: PM, HND, atau username"
                 icon={<User size={16} />}
               />
             </div>
@@ -850,7 +850,7 @@ export default function App() {
                 type="password"
                 value={loginPass}
                 onValueChange={setLoginPass}
-                placeholder="Masukkan password"
+                placeholder="Masukkan password akun"
                 icon={<Lock size={16} />}
               />
             </div>
@@ -869,7 +869,7 @@ export default function App() {
 
           <div className="login-foot">
             <ShieldCheck size={14} color="#10B981" />
-            <span>Kredensial Petugas: <strong>rick</strong> / <strong>rick</strong></span>
+            <span>Akses Terenkripsi & Terproteksi · SMAN 18 Batam</span>
           </div>
         </Panel>
       </div>
