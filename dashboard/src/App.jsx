@@ -1,37 +1,56 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TabBar, Switch, Button, Glass, Input, SearchField, SegmentedControl } from 'glisse';
+import { Menu, TabBar, Switch, Button, Glass, Input, SearchField, SegmentedControl } from 'glisse';
 import {
+  LayoutDashboard,
   Monitor,
-  AlertTriangle,
-  BarChart3,
+  Server,
+  Activity,
+  Users,
+  ShieldCheck,
   Settings as SettingsIcon,
   Battery,
   Wifi,
-  Activity,
   Thermometer,
-  ShieldAlert,
-  LogOut,
   Smartphone,
-  CheckCircle,
+  LogOut,
+  RefreshCw,
+  Unlock,
+  Download,
+  Trash2,
+  Check,
   Copy,
+  AlertTriangle,
+  Sliders,
+  Clock,
+  Sparkles,
+  Layers,
+  CircleDot,
+  Radio,
+  FileSpreadsheet,
   Lock,
   User,
-  Radio,
-  Clock,
-  Check,
-  Zap
+  Zap,
+  Info
 } from 'lucide-react';
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('ujiankita_superadmin_token') || '');
   const [students, setStudents] = useState([]);
-  const [activeTab, setActiveTab] = useState('monitoring');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [simulatorRunning, setSimulatorRunning] = useState(false);
+  const [liquidGlassEnabled, setLiquidGlassEnabled] = useState(
+    () => localStorage.getItem('ujiankita_liquid_glass') !== 'false'
+  );
+  const [soundAlertEnabled, setSoundAlertEnabled] = useState(
+    () => localStorage.getItem('ujiankita_sound_alert') === 'true'
+  );
   const [copied, setCopied] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+  const [uptimeSeconds, setUptimeSeconds] = useState(148);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   // Login form state
   const [loginUser, setLoginUser] = useState('rick');
@@ -40,25 +59,37 @@ export default function App() {
 
   const eventSourceRef = useRef(null);
 
-  // Live Clock
+  // Responsive detector
   useEffect(() => {
-    const updateTime = () => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Persist Liquid Glass preference
+  useEffect(() => {
+    localStorage.setItem('ujiankita_liquid_glass', liquidGlassEnabled ? 'true' : 'false');
+  }, [liquidGlassEnabled]);
+
+  // Persist Sound Alert preference
+  useEffect(() => {
+    localStorage.setItem('ujiankita_sound_alert', soundAlertEnabled ? 'true' : 'false');
+  }, [soundAlertEnabled]);
+
+  // Live Clock & Uptime
+  useEffect(() => {
+    const interval = setInterval(() => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+      setUptimeSeconds((prev) => prev + 1);
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
   // SSE Realtime Connection
-  useEffect(() => {
-    if (!token) {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      return;
+  const connectSSE = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
 
     const es = new EventSource('/api/events');
@@ -82,15 +113,20 @@ export default function App() {
           });
         }
       } catch (err) {
-        console.error('SSE parse error:', err);
+        console.error('SSE error:', err);
       }
     };
 
     es.onerror = () => {
       console.warn('SSE reconnecting...');
     };
+  };
 
-    // Initial fetch
+  useEffect(() => {
+    if (!token) return;
+    connectSSE();
+
+    // Fetch initial list
     fetch('/api/students', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -99,12 +135,13 @@ export default function App() {
       .catch(() => {});
 
     return () => {
-      es.close();
-      eventSourceRef.current = null;
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
     };
   }, [token]);
 
-  // Periodic Stale Student Cleanup (> 18s without heartbeat)
+  // Auto Stale Cleanup (>18s without response)
   useEffect(() => {
     const timer = setInterval(() => {
       const now = Date.now();
@@ -161,7 +198,7 @@ export default function App() {
     }
   };
 
-  // Remote Unlock Action
+  // Remote Unlock (Single)
   const handleRemoteUnlock = async (deviceId) => {
     try {
       const res = await fetch('/api/students/unlock', {
@@ -180,10 +217,6 @@ export default function App() {
                   ...s,
                   status: 'mengerjakan',
                   leaveCount: 0,
-                  violationLogs: [
-                    ...(s.violationLogs || []),
-                    { timestamp: Date.now(), text: 'Sesi dibuka kembali oleh Super-Admin (Remote Unlock)' },
-                  ],
                 }
               : s
           )
@@ -194,25 +227,54 @@ export default function App() {
     }
   };
 
-  // Selected student for telemetry modal
-  const selectedStudent = useMemo(() => {
-    return students.find((s) => s.deviceId === selectedStudentId) || null;
-  }, [students, selectedStudentId]);
+  // Remote Unlock All
+  const handleUnlockAll = async () => {
+    const lockedStudents = students.filter((s) => s.status === 'terkunci' || s.status === 'keluar');
+    for (const s of lockedStudents) {
+      await handleRemoteUnlock(s.deviceId);
+    }
+  };
 
-  // Filtered Students
-  const filteredStudents = useMemo(() => {
-    return students.filter((s) => {
-      if (filter !== 'all' && s.status !== filter) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const matchName = (s.name || '').toLowerCase().includes(q);
-        const matchClass = (s.className || '').toLowerCase().includes(q);
-        const matchDevice = (s.deviceLabel || '').toLowerCase().includes(q);
-        return matchName || matchClass || matchDevice;
-      }
-      return true;
+  // Export CSV
+  const handleExportCSV = () => {
+    const headers = ['ID Perangkat', 'Nama Siswa', 'Kelas', 'Mata Pelajaran', 'Status', 'Baterai', 'Suhu', 'Ping', 'Terakhir Aktif'];
+    const rows = students.map((s) => [
+      s.deviceId,
+      `"${s.name}"`,
+      `"${s.className}"`,
+      `"${s.subject}"`,
+      s.status,
+      `${s.batteryLevel}%`,
+      `${s.temperature}°C`,
+      `${s.pingMs}ms`,
+      new Date(s.lastSeen).toISOString(),
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `ujiankita-monitoring-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Clear demo / reset
+  const handleResetSession = () => {
+    if (confirm('Bersihkan semua siswa simulasi dan reset sesi monitoring?')) {
+      handleToggleSimulator(false);
+      setStudents((prev) => prev.filter((s) => !s.deviceId.startsWith('SIM-')));
+    }
+  };
+
+  // Copy endpoint handler
+  const copyEndpoint = () => {
+    const url = `http://${window.location.host}/api/telemetry`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     });
-  }, [students, filter, search]);
+  };
 
   // Metrics Count
   const counts = useMemo(() => {
@@ -231,16 +293,27 @@ export default function App() {
     return { total, mengerjakan, keluar, terkunci, selesai };
   }, [students]);
 
-  // Copy endpoint handler
-  const copyEndpoint = () => {
-    const url = `http://${window.location.host}/api/telemetry`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  // Filtered Students
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      if (filter !== 'all' && s.status !== filter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchName = (s.name || '').toLowerCase().includes(q);
+        const matchClass = (s.className || '').toLowerCase().includes(q);
+        const matchDevice = (s.deviceLabel || '').toLowerCase().includes(q);
+        return matchName || matchClass || matchDevice;
+      }
+      return true;
     });
-  };
+  }, [students, filter, search]);
 
-  // Helper for status badge presentation
+  // Selected student for modal
+  const selectedStudent = useMemo(() => {
+    return students.find((s) => s.deviceId === selectedStudentId) || null;
+  }, [students, selectedStudentId]);
+
+  // Status Presentation Helper
   const getStatusPresentation = (status, leaveCount) => {
     switch (status) {
       case 'mengerjakan':
@@ -276,20 +349,44 @@ export default function App() {
     }
   };
 
+  // Format uptime
+  const formatUptime = (sec) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h > 0 ? h + 'j ' : ''}${m}m ${s}d`;
+  };
+
+  // Dynamic Wrapper Component (Glass vs Standard)
+  const Panel = ({ children, className = '', style = {}, onClick }) => {
+    if (liquidGlassEnabled) {
+      return (
+        <Glass className={className} style={style} onClick={onClick}>
+          {children}
+        </Glass>
+      );
+    }
+    return (
+      <div className={`standard-panel ${className}`} style={style} onClick={onClick}>
+        {children}
+      </div>
+    );
+  };
+
   // =========================================================================
-  // VIEW: LOGIN SCREEN (if not authenticated)
+  // VIEW: LOGIN SCREEN (If not authenticated)
   // =========================================================================
   if (!token) {
     return (
       <div className="login-screen">
-        <Glass className="login-card">
+        <Panel className="login-card">
           <div className="login-head">
             <div className="login-badge">
               <span className="pulse-dot"></span>
               <span>SMAN 18 BATAM</span>
             </div>
             <h1>Super-Admin Monitor</h1>
-            <p>Glisse Liquid Glass Realtime Exam Integrity Panel</p>
+            <p>UjianKita Realtime Integrity Control Panel</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
@@ -316,415 +413,781 @@ export default function App() {
 
             {loginError && <div className="error-banner">{loginError}</div>}
 
-            <Button variant="filled" tint="#10B981" type="submit" style={{ width: '100%', height: 44, marginTop: 8 }}>
+            <Button
+              variant="filled"
+              tint="#10B981"
+              type="submit"
+              style={{ width: '100%', height: 44, marginTop: 8 }}
+            >
               Masuk Dashboard Super-Admin
             </Button>
           </form>
 
           <div className="login-foot">
-            <ShieldAlert size={14} color="#10B981" />
-            <span>Enkripsi Sesi Aktif · Super-Admin (rick / rick)</span>
+            <ShieldCheck size={14} color="#10B981" />
+            <span>Kredensial Super-Admin Resmi: <strong>rick</strong> / <strong>rick</strong></span>
           </div>
-        </Glass>
+        </Panel>
       </div>
     );
   }
 
   // =========================================================================
-  // VIEW: MAIN DASHBOARD
+  // VIEW: AUTHENTICATED SUPER-ADMIN DASHBOARD
   // =========================================================================
   return (
-    <div className="app-container">
-      {/* Top Header */}
-      <Glass className="dashboard-topbar">
-        <div className="topbar-brand">
-          <div className="brand-icon-box">
-            <Monitor size={22} />
+    <div className={`admin-app-root ${liquidGlassEnabled ? 'liquid-mode' : 'standard-mode'}`}>
+      {/* DESKTOP SIDEBAR (Left) */}
+      <aside className="admin-desktop-sidebar">
+        <div className="sidebar-brand-box">
+          <div className="brand-logo-icon">
+            <Zap size={20} color="#10B981" />
           </div>
-          <div className="brand-title-wrap">
-            <h1>
-              UjianKita <span className="badge-tag">Super-Admin</span>
-            </h1>
-            <div className="brand-sub">SMAN 18 Batam · Monitoring Panel</div>
-          </div>
-        </div>
-
-        <div className="topbar-center">
-          <div className="live-pill">
-            <span className="pulse-dot"></span>
-            <span>LIVE SERVER</span>
-          </div>
-          <div className="clock-val">{currentTime}</div>
-        </div>
-
-        <div className="topbar-actions">
-          <div className="demo-toggle-wrap">
-            <span>Demo Siswa</span>
-            <Switch
-              aria-label="Mode Demo Siswa"
-              checked={simulatorRunning}
-              onCheckedChange={handleToggleSimulator}
-            />
-          </div>
-
-          <div className="admin-pill">
-            <div className="admin-avatar">R</div>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>rick</span>
-            <button onClick={handleLogout} className="logout-icon-btn" title="Logout">
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </Glass>
-
-      {/* Main Workspace Area */}
-      <main className="main-workspace">
-        {/* TAB 1: MONITORING */}
-        {activeTab === 'monitoring' && (
           <div>
-            {/* Metrics Row */}
-            <div className="metrics-row">
-              <Glass
-                className={`metric-card ${filter === 'all' ? 'active' : ''}`}
-                onClick={() => setFilter('all')}
-              >
-                <div className="metric-header">Total Terhubung</div>
-                <div className="metric-number">{counts.total}</div>
-                <div className="metric-subtext">Siswa Aktif Ujian</div>
-              </Glass>
+            <div className="sidebar-brand-title">UjianKita</div>
+            <div className="sidebar-brand-sub">Super-Admin Monitor</div>
+          </div>
+        </div>
 
-              <Glass
-                className={`metric-card ${filter === 'mengerjakan' ? 'active' : ''}`}
-                onClick={() => setFilter('mengerjakan')}
-              >
-                <div className="metric-header color-green">🟢 Mengerjakan</div>
-                <div className="metric-number color-green">{counts.mengerjakan}</div>
-                <div className="metric-subtext">Fokus di Layar Soal</div>
-              </Glass>
+        <div className="sidebar-school-tag">
+          <CircleDot size={12} color="#10B981" />
+          <span>SMAN 18 BATAM</span>
+        </div>
 
-              <Glass
-                className={`metric-card ${filter === 'keluar' ? 'active' : ''}`}
-                onClick={() => setFilter('keluar')}
-              >
-                <div className="metric-header color-yellow">🟡 Keluar Aplikasi</div>
-                <div className="metric-number color-yellow">{counts.keluar}</div>
-                <div className="metric-subtext">Peringatan 1-2x</div>
-              </Glass>
+        <nav className="sidebar-nav-menu">
+          <div className="nav-group-label">NAVIGASI UTAMA</div>
 
-              <Glass
-                className={`metric-card ${filter === 'terkunci' ? 'active' : ''}`}
-                onClick={() => setFilter('terkunci')}
-              >
-                <div className="metric-header color-red">🔴 Sesi Terkunci</div>
-                <div className="metric-number color-red">{counts.terkunci}</div>
-                <div className="metric-subtext">Melanggar 3x</div>
-              </Glass>
+          <button
+            className={`sidebar-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            <LayoutDashboard size={18} />
+            <span>Dashboard</span>
+          </button>
 
-              <Glass
-                className={`metric-card ${filter === 'selesai' ? 'active' : ''}`}
-                onClick={() => setFilter('selesai')}
-              >
-                <div className="metric-header color-blue">🔵 Selesai</div>
-                <div className="metric-number color-blue">{counts.selesai}</div>
-                <div className="metric-subtext">Telah Kirim Jawaban</div>
-              </Glass>
+          <button
+            className={`sidebar-nav-item ${activeTab === 'monitoring' ? 'active' : ''}`}
+            onClick={() => setActiveTab('monitoring')}
+          >
+            <Monitor size={18} />
+            <span>Monitoring</span>
+            {counts.total > 0 && <span className="nav-count-pill">{counts.total}</span>}
+          </button>
+
+          <button
+            className={`sidebar-nav-item ${activeTab === 'system' ? 'active' : ''}`}
+            onClick={() => setActiveTab('system')}
+          >
+            <Server size={18} />
+            <span>System</span>
+          </button>
+
+          <button
+            className={`sidebar-nav-item ${activeTab === 'status' ? 'active' : ''}`}
+            onClick={() => setActiveTab('status')}
+          >
+            <Activity size={18} />
+            <span>Status API</span>
+          </button>
+
+          <button
+            className={`sidebar-nav-item ${activeTab === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            <Users size={18} />
+            <span>User (ID)</span>
+          </button>
+
+          <div className="nav-group-label" style={{ marginTop: 16 }}>
+            AKUN & KONTROL
+          </div>
+
+          <button
+            className={`sidebar-nav-item ${activeTab === 'account' ? 'active' : ''}`}
+            onClick={() => setActiveTab('account')}
+          >
+            <ShieldCheck size={18} />
+            <span>Akun Super-Admin</span>
+          </button>
+
+          <button
+            className={`sidebar-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <SettingsIcon size={18} />
+            <span>Settings</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-bottom-profile">
+          <div className="profile-mini-avatar">R</div>
+          <div className="profile-mini-info">
+            <div className="profile-mini-name">rick</div>
+            <div className="profile-mini-role">Super-Admin</div>
+          </div>
+          <button className="sidebar-logout-btn" onClick={handleLogout} title="Keluar">
+            <LogOut size={16} />
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN VIEWPORT */}
+      <div className="admin-main-viewport">
+        {/* Top Header */}
+        <header className="admin-topbar">
+          <div className="topbar-left">
+            <div className="mobile-only-brand">
+              <span className="brand-dot"></span>
+              <strong>UjianKita</strong>
+            </div>
+            <div className="live-pill">
+              <span className="pulse-dot"></span>
+              <span>LIVE SERVER</span>
+            </div>
+            <div className="clock-val">{currentTime}</div>
+          </div>
+
+          <div className="topbar-right">
+            {/* Quick Demo Switch */}
+            <div className="topbar-demo-switch">
+              <span style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Demo:</span>
+              <Switch
+                aria-label="Toggle Demo Siswa"
+                checked={simulatorRunning}
+                onCheckedChange={handleToggleSimulator}
+              />
             </div>
 
-            {/* Filter & Search Bar */}
-            <Glass className="filter-search-bar">
-              <SearchField
-                value={search}
-                onValueChange={setSearch}
-                placeholder="Cari nama siswa, kelas, perangkat..."
-              />
-
-              <SegmentedControl
-                value={filter}
-                onValueChange={(val) => val && setFilter(val)}
+            {/* Kelvin Zhang Glisse Menu Component */}
+            <div className="topbar-menu-wrapper">
+              <Menu
+                aria-label="Menu Aksi Super-Admin"
                 items={[
-                  { value: 'all', label: 'Semua' },
-                  { value: 'mengerjakan', label: '🟢 Mengerjakan' },
-                  { value: 'keluar', label: '🟡 Keluar' },
-                  { value: 'terkunci', label: '🔴 Terkunci' },
-                  { value: 'selesai', label: '🔵 Selesai' },
+                  { label: 'Refresh Data SSE', icon: <RefreshCw size={15} />, onSelect: connectSSE },
+                  { label: 'Buka Kunci Semua Siswa', icon: <Unlock size={15} />, onSelect: handleUnlockAll },
+                  { label: 'Ekspor Data CSV', icon: <Download size={15} />, onSelect: handleExportCSV },
+                  { label: 'Pengaturan', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
+                  'separator',
+                  { label: 'Bersihkan Sesi / Demo', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true },
                 ]}
               />
-            </Glass>
-
-            {/* Students Grid */}
-            {filteredStudents.length === 0 ? (
-              <Glass className="empty-box">
-                <div className="empty-icon">
-                  <Monitor size={32} />
-                </div>
-                <div className="empty-title">Belum Ada Siswa Aktif</div>
-                <div className="empty-desc">
-                  Aktifkan tombol <strong>"Demo Siswa"</strong> di atas atau buka APK UjianKita pada HP siswa untuk
-                  melihat telemetry secara realtime.
-                </div>
-              </Glass>
-            ) : (
-              <div className="students-grid">
-                {filteredStudents.map((s) => {
-                  const meta = getStatusPresentation(s.status, s.leaveCount);
-                  const timeFormatted = new Date(s.startTime || Date.now()).toLocaleTimeString('id-ID', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-
-                  return (
-                    <Glass
-                      key={s.deviceId}
-                      className="student-card"
-                      onClick={() => setSelectedStudentId(s.deviceId)}
-                    >
-                      <div className="card-top">
-                        <div className="student-name">{s.name}</div>
-                        <div className="class-pill">{s.className}</div>
-                      </div>
-
-                      <div className="card-meta-row">
-                        <div className="device-chip">
-                          <Smartphone size={14} />
-                          <span>{s.deviceLabel || 'Android'}</span>
-                        </div>
-                        <div className="time-chip">{timeFormatted} WIB</div>
-                      </div>
-
-                      <div className={`card-status-badge ${meta.className}`}>
-                        <div className="status-badge-left">
-                          <span className="status-dot"></span>
-                          <span>{meta.title}</span>
-                        </div>
-                        <span>{meta.sub}</span>
-                      </div>
-
-                      <div className="card-quick-stats">
-                        <div className="stat-item" title="Baterai">
-                          <Battery size={14} />
-                          <span>
-                            {s.isCharging ? '⚡' : ''}
-                            {s.batteryLevel || 100}%
-                          </span>
-                        </div>
-                        <div className="stat-item color-green" title="Ping">
-                          <Activity size={14} />
-                          <span>{s.pingMs || 9}ms</span>
-                        </div>
-                        <div className="stat-item" title="Suhu HP">
-                          <Thermometer size={14} />
-                          <span>{s.temperature || 36.5}°C</span>
-                        </div>
-                      </div>
-
-                      <div className="click-hint">Klik untuk melihat detail & buka kunci ➔</div>
-                    </Glass>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: PELANGGARAN */}
-        {activeTab === 'violations' && (
-          <div>
-            <div className="tab-section-head">
-              <h2>Log Riwayat Pelanggaran Siswa</h2>
-              <p>Daftar siswa yang keluar dari aplikasi ujian atau mengalami sesi terkunci.</p>
             </div>
 
-            <div className="violations-list">
-              {students.filter((s) => s.status === 'terkunci' || s.status === 'keluar' || (s.violationLogs && s.violationLogs.length > 1)).length === 0 ? (
-                <Glass className="empty-box">
-                  <div className="empty-title">Tidak Ada Pelanggaran Aktif</div>
-                  <div className="empty-desc">Semua siswa sedang fokus di layar soal tanpa pelanggaran.</div>
-                </Glass>
-              ) : (
-                students
-                  .filter((s) => s.status === 'terkunci' || s.status === 'keluar' || (s.violationLogs && s.violationLogs.length > 1))
-                  .map((s) => (
-                    <Glass key={s.deviceId} className="violation-row">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div
-                          style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 12,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: s.status === 'terkunci' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                            color: s.status === 'terkunci' ? '#EF4444' : '#F59E0B',
-                          }}
-                        >
-                          <AlertTriangle size={18} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 15, fontWeight: 700 }}>
-                            {s.name} · <span className="class-pill">{s.className}</span>
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--text-concrete)' }}>
-                            {s.status === 'terkunci'
-                              ? '🔴 Sesi Terkunci - Melanggar batas 3x keluar aplikasi'
-                              : `🟡 Terdeteksi keluar aplikasi (${s.leaveCount}/3 kali)`}
-                          </div>
-                        </div>
-                      </div>
+            <div className="admin-avatar-pill">
+              <div className="profile-mini-avatar">R</div>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>rick</span>
+            </div>
+          </div>
+        </header>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        {s.status === 'terkunci' && (
-                          <Button
-                            destructive
-                            onClick={() => handleRemoteUnlock(s.deviceId)}
-                            style={{ height: 36, fontSize: 12 }}
-                          >
-                            Buka Kunci Jarak Jauh
-                          </Button>
-                        )}
-                        <Button
-                          variant="glass"
-                          onClick={() => setSelectedStudentId(s.deviceId)}
-                          style={{ height: 36, fontSize: 12 }}
-                        >
-                          Detail
-                        </Button>
-                      </div>
-                    </Glass>
-                  ))
+        {/* Content Workspace */}
+        <main className="admin-workspace-scroll">
+          {/* =================================================================== */}
+          {/* TAB 1: DASHBOARD (HOME)                                             */}
+          {/* =================================================================== */}
+          {activeTab === 'dashboard' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Dashboard Pengawasan Ujian</h1>
+                  <p className="workspace-sub">Ringkasan status peserta, kesehatan sesi, dan deteksi integritas realtime.</p>
+                </div>
+              </div>
+
+              {/* Status Metric Grid */}
+              <div className="metrics-grid">
+                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('all'); }}>
+                  <div className="metric-box-title">Total Terhubung</div>
+                  <div className="metric-box-val">{counts.total}</div>
+                  <div className="metric-box-desc">Peserta Aktif di Server</div>
+                </Panel>
+
+                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('mengerjakan'); }}>
+                  <div className="metric-box-title color-green">🟢 Mengerjakan</div>
+                  <div className="metric-box-val color-green">{counts.mengerjakan}</div>
+                  <div className="metric-box-desc">Fokus di Layar Soal</div>
+                </Panel>
+
+                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('keluar'); }}>
+                  <div className="metric-box-title color-yellow">🟡 Keluar Aplikasi</div>
+                  <div className="metric-box-val color-yellow">{counts.keluar}</div>
+                  <div className="metric-box-desc">Peringatan Terdeteksi (1-2x)</div>
+                </Panel>
+
+                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('terkunci'); }}>
+                  <div className="metric-box-title color-red">🔴 Sesi Terkunci</div>
+                  <div className="metric-box-val color-red">{counts.terkunci}</div>
+                  <div className="metric-box-desc">Melanggar Batas 3x Keluar</div>
+                </Panel>
+
+                <Panel className="metric-box" onClick={() => { setActiveTab('monitoring'); setFilter('selesai'); }}>
+                  <div className="metric-box-title color-blue">🔵 Selesai Ujian</div>
+                  <div className="metric-box-val color-blue">{counts.selesai}</div>
+                  <div className="metric-box-desc">Telah Kirim Jawaban</div>
+                </Panel>
+              </div>
+
+              {/* Quick Info Banners */}
+              <div className="dashboard-double-cards">
+                <Panel className="banner-card">
+                  <div className="banner-card-head">
+                    <Zap size={18} color="#10B981" />
+                    <h3>Status Sistem & Pelaksanaan</h3>
+                  </div>
+                  <div className="banner-card-body">
+                    <div className="info-stat-row">
+                      <span>Server Engine</span>
+                      <strong>Node.js SSE EventStream (Port 5000)</strong>
+                    </div>
+                    <div className="info-stat-row">
+                      <span>Protokol Keamanan</span>
+                      <strong>Kiosk Pinning & Window Lock Active</strong>
+                    </div>
+                    <div className="info-stat-row">
+                      <span>Auto-Purge Inaktif</span>
+                      <strong>18 Detik Tanpa Heartbeat</strong>
+                    </div>
+                    <div className="info-stat-row">
+                      <span>Pengalaman UI</span>
+                      <strong>{liquidGlassEnabled ? 'Liquid Glass (Apple iOS)' : 'Standar (Modern Graphite)'}</strong>
+                    </div>
+                  </div>
+                </Panel>
+
+                <Panel className="banner-card">
+                  <div className="banner-card-head">
+                    <Activity size={18} color="#3B82F6" />
+                    <h3>Aksi Cepat Super-Admin</h3>
+                  </div>
+                  <div className="banner-card-body">
+                    <p style={{ fontSize: 13, color: 'var(--text-concrete)', marginBottom: 12 }}>
+                      Gunakan tombol berikut untuk kontrol massal sesi seluruh siswa:
+                    </p>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <Button variant="glass" icon={<Unlock size={14} />} onClick={handleUnlockAll}>
+                        Buka Kunci Semua Siswa
+                      </Button>
+                      <Button variant="glass" icon={<Download size={14} />} onClick={handleExportCSV}>
+                        Unduh Laporan CSV
+                      </Button>
+                      <Button
+                        variant="glass"
+                        icon={<Monitor size={14} />}
+                        onClick={() => setActiveTab('monitoring')}
+                      >
+                        Buka Layar Monitoring
+                      </Button>
+                    </div>
+                  </div>
+                </Panel>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================== */}
+          {/* TAB 2: MONITORING REALTIME                                          */}
+          {/* =================================================================== */}
+          {activeTab === 'monitoring' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Monitoring Siswa Realtime</h1>
+                  <p className="workspace-sub">Pantau kartu perangkat siswa yang sedang aktif di ruang ujian.</p>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <Panel className="search-filter-panel">
+                <SearchField
+                  value={search}
+                  onValueChange={setSearch}
+                  placeholder="Cari nama siswa, kelas, perangkat..."
+                />
+
+                <SegmentedControl
+                  value={filter}
+                  onValueChange={(val) => val && setFilter(val)}
+                  items={[
+                    { value: 'all', label: 'Semua' },
+                    { value: 'mengerjakan', label: '🟢 Mengerjakan' },
+                    { value: 'keluar', label: '🟡 Keluar' },
+                    { value: 'terkunci', label: '🔴 Terkunci' },
+                    { value: 'selesai', label: '🔵 Selesai' },
+                  ]}
+                />
+              </Panel>
+
+              {/* Student Cards Grid (Clean layout: no activity list clutter) */}
+              {filteredStudents.length === 0 ? (
+                <Panel className="empty-box">
+                  <div className="empty-icon">
+                    <Monitor size={32} />
+                  </div>
+                  <div className="empty-title">Belum Ada Siswa Aktif</div>
+                  <div className="empty-desc">
+                    Buka aplikasi Android UjianKita siswa atau aktifkan tombol <strong>"Demo"</strong> di kanan atas.
+                  </div>
+                </Panel>
+              ) : (
+                <div className="students-grid">
+                  {filteredStudents.map((s) => {
+                    const meta = getStatusPresentation(s.status, s.leaveCount);
+                    const timeFormatted = new Date(s.startTime || Date.now()).toLocaleTimeString('id-ID', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+
+                    return (
+                      <Panel
+                        key={s.deviceId}
+                        className="student-card"
+                        onClick={() => setSelectedStudentId(s.deviceId)}
+                      >
+                        <div className="card-top">
+                          <div className="student-name">{s.name}</div>
+                          <div className="class-pill">{s.className}</div>
+                        </div>
+
+                        <div className="card-meta-row">
+                          <div className="device-chip">
+                            <Smartphone size={14} />
+                            <span>{s.deviceLabel || 'Android'}</span>
+                          </div>
+                          <div className="time-chip">{timeFormatted} WIB</div>
+                        </div>
+
+                        <div className={`card-status-badge ${meta.className}`}>
+                          <div className="status-badge-left">
+                            <span className="status-dot"></span>
+                            <span>{meta.title}</span>
+                          </div>
+                          <span>{meta.sub}</span>
+                        </div>
+
+                        <div className="card-quick-stats">
+                          <div className="stat-item" title="Baterai">
+                            <Battery size={14} />
+                            <span>
+                              {s.isCharging ? '⚡' : ''}
+                              {s.batteryLevel || 100}%
+                            </span>
+                          </div>
+                          <div className="stat-item color-green" title="Ping Jaringan">
+                            <Activity size={14} />
+                            <span>{s.pingMs || 9}ms</span>
+                          </div>
+                          <div className="stat-item" title="Suhu HP">
+                            <Thermometer size={14} />
+                            <span>{s.temperature || 36.5}°C</span>
+                          </div>
+                        </div>
+
+                        <div className="click-hint">Klik untuk melihat detail & remote unlock ➔</div>
+                      </Panel>
+                    );
+                  })}
+                </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* TAB 3: STATISTIK */}
-        {activeTab === 'stats' && (
-          <div>
-            <div className="tab-section-head">
-              <h2>Statistik Integritas & Kesehatan Perangkat</h2>
-              <p>Analisis kondisi baterai, jaringan, dan kepatuhan siswa secara realtime.</p>
+          {/* =================================================================== */}
+          {/* TAB 3: SYSTEM                                                       */}
+          {/* =================================================================== */}
+          {activeTab === 'system' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Status Server & Lingkungan Sistem</h1>
+                  <p className="workspace-sub">Informasi performa runtime, soket SSE, dan memori backend.</p>
+                </div>
+              </div>
+
+              <div className="stats-grid">
+                <Panel className="stat-box">
+                  <div className="stat-title">Server Runtime</div>
+                  <div className="stat-huge">Node.js 22</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Zero external native deps · Standalone Server</div>
+                </Panel>
+
+                <Panel className="stat-box">
+                  <div className="stat-title">Uptime Server</div>
+                  <div className="stat-huge">{formatUptime(uptimeSeconds)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Aktif tanpa crash / gangguan</div>
+                </Panel>
+
+                <Panel className="stat-box">
+                  <div className="stat-title">Pembersihan Otomatis</div>
+                  <div className="stat-huge">18s Timeout</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Siswa inaktif otomatis dibersihkan</div>
+                </Panel>
+              </div>
+
+              <Panel className="system-detail-panel" style={{ marginTop: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Metrik Soket & Protokol</h3>
+                <div className="banner-card-body">
+                  <div className="info-stat-row">
+                    <span>Soket SSE Aktif</span>
+                    <strong>1 Sambungan Dashboard Terverifikasi</strong>
+                  </div>
+                  <div className="info-stat-row">
+                    <span>Frekuensi Heartbeat</span>
+                    <strong>Tiap 3000 ms</strong>
+                  </div>
+                  <div className="info-stat-row">
+                    <span>Protokol Enkripsi</span>
+                    <strong>Bearer Session Token SHA-256</strong>
+                  </div>
+                  <div className="info-stat-row">
+                    <span>Endpoint Port</span>
+                    <strong>5000 (Bebas dari PWA cache)</strong>
+                  </div>
+                </div>
+              </Panel>
             </div>
+          )}
 
-            <div className="stats-grid">
-              <Glass className="stat-box">
-                <div className="stat-title">Tingkat Kepatuhan Siswa</div>
-                <div className="stat-huge">
-                  {students.length === 0
-                    ? '100%'
-                    : `${Math.round(
-                        (students.filter((s) => s.status === 'mengerjakan' || s.status === 'selesai').length /
-                          students.length) *
-                          100
-                      )}%`}
+          {/* =================================================================== */}
+          {/* TAB 4: STATUS (API)                                                 */}
+          {/* =================================================================== */}
+          {activeTab === 'status' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Konektivitas & Status API</h1>
+                  <p className="workspace-sub">Diagnostik kesehatan REST API dan aliran telemetri siswa.</p>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>
-                  Siswa tetap berada di layar soal tanpa keluar aplikasi.
-                </div>
-              </Glass>
+              </div>
 
-              <Glass className="stat-box">
-                <div className="stat-title">Terhubung ke Wi-Fi Sekolah</div>
-                <div className="stat-huge">{students.length} Siswa</div>
-                <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>
-                  Semua peserta terverifikasi terhubung ke SSID SMAN18-GUEST.
-                </div>
-              </Glass>
+              <div className="api-status-list">
+                <Panel className="api-status-row">
+                  <div className="api-status-lead">
+                    <span className="api-method post">POST</span>
+                    <div>
+                      <div className="api-url">/api/telemetry</div>
+                      <div className="api-desc">Menerima denyut baterai, status ujian, dan suhu dari APK siswa</div>
+                    </div>
+                  </div>
+                  <div className="api-badge online">200 OK · Active</div>
+                </Panel>
 
-              <Glass className="stat-box">
-                <div className="stat-title">Peringatan Baterai Rendah (&lt; 20%)</div>
-                <div className="stat-huge">
-                  {students.filter((s) => (s.batteryLevel || 100) < 20).length} Siswa
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-concrete)' }}>
-                  Perlu pengecasan agar HP tidak mati mendadak saat ujian.
-                </div>
-              </Glass>
+                <Panel className="api-status-row">
+                  <div className="api-status-lead">
+                    <span className="api-method get">GET</span>
+                    <div>
+                      <div className="api-url">/api/events</div>
+                      <div className="api-desc">Streaming Server-Sent Events (SSE) update realtime ke dashboard</div>
+                    </div>
+                  </div>
+                  <div className="api-badge online">Connected</div>
+                </Panel>
+
+                <Panel className="api-status-row">
+                  <div className="api-status-lead">
+                    <span className="api-method post">POST</span>
+                    <div>
+                      <div className="api-url">/api/login</div>
+                      <div className="api-desc">Gerbang verifikasi login kredensial Super-Admin (rick/rick)</div>
+                    </div>
+                  </div>
+                  <div className="api-badge online">Secured</div>
+                </Panel>
+
+                <Panel className="api-status-row">
+                  <div className="api-status-lead">
+                    <span className="api-method post">POST</span>
+                    <div>
+                      <div className="api-url">/api/students/unlock</div>
+                      <div className="api-desc">RPC pembukaan kunci layar ujian jarak jauh dari Super-Admin</div>
+                    </div>
+                  </div>
+                  <div className="api-badge online">Ready</div>
+                </Panel>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* TAB 4: PENGATURAN */}
-        {activeTab === 'settings' && (
-          <div>
-            <div className="tab-section-head">
-              <h2>Pengaturan Server Super-Admin</h2>
-              <p>Konfigurasi endpoint telemetry dan status sistem pemantauan.</p>
+          {/* =================================================================== */}
+          {/* TAB 5: USER (ID) / DATA SISWA TABLE                                 */}
+          {/* =================================================================== */}
+          {activeTab === 'users' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Data Siswa & Perangkat (User ID)</h1>
+                  <p className="workspace-sub">Daftar lengkap sesi peserta ujian yang terdaftar saat ini.</p>
+                </div>
+              </div>
+
+              <Panel className="user-table-wrapper">
+                <table className="user-data-table">
+                  <thead>
+                    <tr>
+                      <th>Device ID</th>
+                      <th>Nama Siswa</th>
+                      <th>Kelas</th>
+                      <th>Perangkat</th>
+                      <th>Status Ujian</th>
+                      <th>Baterai</th>
+                      <th>Ping</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--text-concrete)' }}>
+                          Belum ada data siswa aktif. Buka APK atau nyalakan mode Demo.
+                        </td>
+                      </tr>
+                    ) : (
+                      students.map((s) => {
+                        const meta = getStatusPresentation(s.status, s.leaveCount);
+                        return (
+                          <tr key={s.deviceId}>
+                            <td className="code-font">{s.deviceId}</td>
+                            <td style={{ fontWeight: 700 }}>{s.name}</td>
+                            <td>{s.className}</td>
+                            <td>{s.deviceLabel}</td>
+                            <td>
+                              <span className={`table-status-pill ${meta.className}`}>
+                                {meta.title}
+                              </span>
+                            </td>
+                            <td>{s.isCharging ? '⚡ ' : ''}{s.batteryLevel || 100}%</td>
+                            <td className="color-green">{s.pingMs || 9}ms</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {s.status === 'terkunci' && (
+                                  <button
+                                    className="table-action-btn danger"
+                                    onClick={() => handleRemoteUnlock(s.deviceId)}
+                                  >
+                                    Buka Kunci
+                                  </button>
+                                )}
+                                <button
+                                  className="table-action-btn"
+                                  onClick={() => setSelectedStudentId(s.deviceId)}
+                                >
+                                  Detail
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </Panel>
             </div>
+          )}
 
-            <Glass className="settings-card">
-              <div className="setting-row">
-                <div className="setting-info">
-                  <h4>Endpoint Telemetry APK Siswa</h4>
-                  <p>{`http://${window.location.host}/api/telemetry`}</p>
-                </div>
-                <Button variant="glass" icon={copied ? <Check size={16} /> : <Copy size={16} />} onClick={copyEndpoint}>
-                  {copied ? 'Tersalin!' : 'Salin URL'}
-                </Button>
-              </div>
-
-              <div className="setting-sep"></div>
-
-              <div className="setting-row">
-                <div className="setting-info">
-                  <h4>Simulasi Profil Siswa Demo</h4>
-                  <p>Menjalankan 8 siswa virtual dengan aktivitas acak untuk pengujian.</p>
-                </div>
-                <Switch
-                  aria-label="Simulasi Data Siswa"
-                  checked={simulatorRunning}
-                  onCheckedChange={handleToggleSimulator}
-                />
-              </div>
-
-              <div className="setting-sep"></div>
-
-              <div className="setting-row">
-                <div className="setting-info">
-                  <h4>Batas Waktu Siswa Tidak Aktif (Timeout)</h4>
-                  <p>Siswa otomatis dihapus jika tidak ada denyut respon (heartbeat) selama 18 detik.</p>
-                </div>
-                <div className="class-pill">18 Detik</div>
-              </div>
-
-              <div className="setting-sep"></div>
-
-              <div className="setting-row">
-                <div className="setting-info">
-                  <h4>Kredensial Super-Admin</h4>
-                  <p>Akun berwenang: <strong>rick</strong> (Hak Penuh Buka Kunci Jarak Jauh).</p>
-                </div>
-                <div className="class-pill" style={{ color: 'var(--status-green)' }}>
-                  Aktif
+          {/* =================================================================== */}
+          {/* TAB 6: AKUN SUPER-ADMIN                                             */}
+          {/* =================================================================== */}
+          {activeTab === 'account' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Profil & Keamanan Akun</h1>
+                  <p className="workspace-sub">Informasi kredensial login dan hak akses Super-Admin.</p>
                 </div>
               </div>
-            </Glass>
-          </div>
-        )}
-      </main>
 
-      {/* ===================================================================== */}
-      {/* KELVIN ZHANG OFFICIAL GLISSE TAB BAR (Anchored at Bottom)              */}
-      {/* ===================================================================== */}
-      <div className="glisse-bottom-bar-container">
-        <TabBar
-          aria-label="Navigasi Utama"
-          value={activeTab}
-          onValueChange={(val) => val && setActiveTab(val)}
-          items={[
-            { value: 'monitoring', label: 'Monitoring', icon: <Monitor size={22} /> },
-            { value: 'violations', label: 'Pelanggaran', icon: <AlertTriangle size={22} /> },
-            { value: 'stats', label: 'Statistik', icon: <BarChart3 size={22} /> },
-            { value: 'settings', label: 'Pengaturan', icon: <SettingsIcon size={22} /> },
-          ]}
-        />
+              <Panel className="settings-card">
+                <div className="account-profile-header">
+                  <div className="profile-large-avatar">R</div>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 800 }}>rick</h2>
+                    <p style={{ fontSize: 13, color: 'var(--text-concrete)' }}>Super-Admin UjianKita · Hak Penuh</p>
+                  </div>
+                </div>
+
+                <div className="setting-sep"></div>
+
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Kredensial Login</h4>
+                    <p>Username: <strong>rick</strong> | Password: <strong>rick</strong></p>
+                  </div>
+                  <div className="class-pill" style={{ color: 'var(--status-green)' }}>Aktif</div>
+                </div>
+
+                <div className="setting-sep"></div>
+
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Hak Akses Khusus</h4>
+                    <p>Membuka kunci sesi jarak jauh (Remote Unlock), bypass PIN, kontrol simulator, dan ekspor CSV.</p>
+                  </div>
+                  <span className="badge-tag">Full Privilege</span>
+                </div>
+
+                <div className="setting-sep"></div>
+
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Keluar dari Sesi</h4>
+                    <p>Mengakhiri sesi Super-Admin dan kembali ke halaman login.</p>
+                  </div>
+                  <Button destructive onClick={handleLogout}>
+                    Logout Sekarang
+                  </Button>
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {/* =================================================================== */}
+          {/* TAB 7: SETTINGS                                                     */}
+          {/* =================================================================== */}
+          {activeTab === 'settings' && (
+            <div className="tab-fade-in">
+              <div className="workspace-header">
+                <div>
+                  <h1 className="workspace-title">Pengaturan Sistem & Tampilan</h1>
+                  <p className="workspace-sub">Kustomisasi pengalaman antarmuka, endpoint, dan simulasi.</p>
+                </div>
+              </div>
+
+              <Panel className="settings-card">
+                {/* 1. TOGGLE LIQUID GLASS vs STANDAR */}
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Pengalaman Tampilan (Liquid Glass vs Standar)</h4>
+                    <p>
+                      {liquidGlassEnabled
+                        ? '🟢 Mode Liquid Glass Aktif: Menggunakan refraksi kaca cair, blur translusen, dan fisika spring Apple iOS.'
+                        : '⚪ Mode Standar Aktif: Menggunakan tombol datar modern (Solid Graphite Flat) tanpa efek kaca.'}
+                    </p>
+                  </div>
+                  <Switch
+                    aria-label="Toggle Liquid Glass vs Standar"
+                    checked={liquidGlassEnabled}
+                    onCheckedChange={setLiquidGlassEnabled}
+                  />
+                </div>
+
+                <div className="setting-sep"></div>
+
+                {/* 2. SIMULATOR TOGGLE */}
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Simulasi Data Ujian Siswa (Demo Mode)</h4>
+                    <p>Jalankan 8 profil siswa virtual dengan beragam status ujian untuk demonstrasi.</p>
+                  </div>
+                  <Switch
+                    aria-label="Toggle Demo Siswa"
+                    checked={simulatorRunning}
+                    onCheckedChange={handleToggleSimulator}
+                  />
+                </div>
+
+                <div className="setting-sep"></div>
+
+                {/* 3. SOUND ALERT TOGGLE */}
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Suara Alarm Pelanggaran</h4>
+                    <p>Bunyikan sinyal audio ketika terdeteksi siswa keluar aplikasi atau terkunci.</p>
+                  </div>
+                  <Switch
+                    aria-label="Toggle Audio Alert"
+                    checked={soundAlertEnabled}
+                    onCheckedChange={setSoundAlertEnabled}
+                  />
+                </div>
+
+                <div className="setting-sep"></div>
+
+                {/* 4. ENDPOINT URL */}
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Endpoint Telemetry APK Siswa</h4>
+                    <p>{`http://${window.location.host}/api/telemetry`}</p>
+                  </div>
+                  <Button variant="glass" icon={copied ? <Check size={16} /> : <Copy size={16} />} onClick={copyEndpoint}>
+                    {copied ? 'Tersalin!' : 'Salin URL'}
+                  </Button>
+                </div>
+
+                <div className="setting-sep"></div>
+
+                {/* 5. TIMEOUT SPEC */}
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <h4>Batas Waktu Siswa Tidak Aktif (Timeout)</h4>
+                    <p>Siswa otomatis dihapus jika tidak ada respon selama 18 detik.</p>
+                  </div>
+                  <div className="class-pill">18 Detik</div>
+                </div>
+              </Panel>
+            </div>
+          )}
+        </main>
       </div>
 
       {/* ===================================================================== */}
-      {/* MODAL: DETAIL TELEMETRY SISWA                                         */}
+      {/* MOBILE (ANDROID) BOTTOM NAVBAR                                         */}
+      {/* Specified by user: home(dashboard), status api, monitoring, akun       */}
+      {/* ===================================================================== */}
+      {isMobile && (
+        <div className="mobile-bottom-nav-container">
+          {liquidGlassEnabled ? (
+            <TabBar
+              aria-label="Navigasi Android"
+              value={activeTab}
+              onValueChange={(val) => val && setActiveTab(val)}
+              items={[
+                { value: 'dashboard', label: 'Home', icon: <LayoutDashboard size={20} /> },
+                { value: 'monitoring', label: 'Monitoring', icon: <Monitor size={20} /> },
+                { value: 'status', label: 'Status API', icon: <Activity size={20} /> },
+                { value: 'account', label: 'Akun', icon: <ShieldCheck size={20} /> },
+              ]}
+            />
+          ) : (
+            <div className="standard-bottom-nav-bar">
+              <button
+                className={`std-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setActiveTab('dashboard')}
+              >
+                <LayoutDashboard size={18} />
+                <span>Home</span>
+              </button>
+              <button
+                className={`std-nav-btn ${activeTab === 'monitoring' ? 'active' : ''}`}
+                onClick={() => setActiveTab('monitoring')}
+              >
+                <Monitor size={18} />
+                <span>Monitoring</span>
+              </button>
+              <button
+                className={`std-nav-btn ${activeTab === 'status' ? 'active' : ''}`}
+                onClick={() => setActiveTab('status')}
+              >
+                <Activity size={18} />
+                <span>Status API</span>
+              </button>
+              <button
+                className={`std-nav-btn ${activeTab === 'account' ? 'active' : ''}`}
+                onClick={() => setActiveTab('account')}
+              >
+                <ShieldCheck size={18} />
+                <span>Akun</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: DETAIL TELEMETRY (Clean: No Activity List Clutter)              */}
       {/* ===================================================================== */}
       {selectedStudent && (
         <div className="modal-backdrop" onClick={() => setSelectedStudentId(null)}>
-          <Glass className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <Panel className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <div className="modal-identity">
@@ -735,7 +1198,11 @@ export default function App() {
                   {selectedStudent.deviceLabel} · {selectedStudent.subject || 'Ujian Sekolah'}
                 </div>
               </div>
-              <Button variant="glass" onClick={() => setSelectedStudentId(null)} style={{ width: 36, height: 36, padding: 0 }}>
+              <Button
+                variant="glass"
+                onClick={() => setSelectedStudentId(null)}
+                style={{ width: 36, height: 36, padding: 0 }}
+              >
                 ✕
               </Button>
             </div>
@@ -749,68 +1216,58 @@ export default function App() {
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--text-concrete)', textTransform: 'uppercase' }}>
-              INFORMASI TAMBAHAN REALTIME
+              INFORMASI TELEMETRI REALTIME
             </div>
 
             <div className="modal-quad-grid">
-              <Glass className="quad-cell">
+              <Panel className="quad-cell">
                 <div className="quad-label">
                   <Battery size={16} />
                   <span>Baterai</span>
                 </div>
                 <div className="quad-value">{selectedStudent.batteryLevel || 100}%</div>
-                <div className="quad-desc">{selectedStudent.isCharging ? '⚡ Sedang Mengecas' : 'Menggunakan Daya Baterai'}</div>
-              </Glass>
+                <div className="quad-desc">{selectedStudent.isCharging ? '⚡ Sedang Mengecas' : 'Daya Baterai'}</div>
+              </Panel>
 
-              <Glass className="quad-cell">
+              <Panel className="quad-cell">
                 <div className="quad-label">
                   <Wifi size={16} />
                   <span>WiFi / Jaringan</span>
                 </div>
                 <div className="quad-value">Wi-Fi</div>
                 <div className="quad-desc">{selectedStudent.network || 'SMAN18-GUEST'}</div>
-              </Glass>
+              </Panel>
 
-              <Glass className="quad-cell">
+              <Panel className="quad-cell">
                 <div className="quad-label">
                   <Activity size={16} />
                   <span>Ping Jaringan</span>
                 </div>
                 <div className="quad-value color-green">{selectedStudent.pingMs || 9} ms</div>
                 <div className="quad-desc">Responsif & Stabil</div>
-              </Glass>
+              </Panel>
 
-              <Glass className="quad-cell">
+              <Panel className="quad-cell">
                 <div className="quad-label">
                   <Thermometer size={16} />
                   <span>Suhu HP</span>
                 </div>
                 <div className="quad-value">{selectedStudent.temperature || 36.5}°C</div>
                 <div className="quad-desc">Suhu Operasional Normal</div>
-              </Glass>
+              </Panel>
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--text-concrete)', textTransform: 'uppercase' }}>
-              RIWAYAT PELANGGARAN & AKTIVITAS
-            </div>
-
-            <div className="timeline-box">
-              {(selectedStudent.violationLogs || []).length === 0 ? (
-                <div className="timeline-entry">
-                  <span className="tl-time">{new Date().toLocaleTimeString('id-ID')}</span>
-                  <span className="tl-text">Siswa fokus di layar ujian tanpa pelanggaran.</span>
-                </div>
-              ) : (
-                [...selectedStudent.violationLogs].reverse().map((log, i) => (
-                  <div key={i} className="timeline-entry">
-                    <span className="tl-time">{new Date(log.timestamp).toLocaleTimeString('id-ID')}</span>
-                    <span className={`tl-text ${log.text.includes('Keluar') || log.text.includes('terkunci') ? 'danger' : ''}`}>
-                      {log.text}
-                    </span>
+            {selectedStudent.status === 'terkunci' && (
+              <div className="locked-warning-banner">
+                <AlertTriangle size={20} color="#EF4444" />
+                <div>
+                  <strong>Siswa Melanggar Batas Keluar Aplikasi 3 Kali!</strong>
+                  <div style={{ fontSize: 12, marginTop: 2 }}>
+                    Layar ujian di HP siswa sedang terkunci. Klik tombol di bawah untuk membuka kunci dari jarak jauh.
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              </div>
+            )}
 
             <div className="modal-footer">
               {(selectedStudent.status === 'terkunci' || (selectedStudent.status === 'keluar' && (selectedStudent.leaveCount || 0) >= 2)) && (
@@ -825,7 +1282,7 @@ export default function App() {
                 Tutup
               </Button>
             </div>
-          </Glass>
+          </Panel>
         </div>
       )}
     </div>

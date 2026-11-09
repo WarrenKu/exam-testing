@@ -1888,6 +1888,7 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
   bool _isLoadingWeb = true;
   bool _canGoBack = false;
   bool _canGoForward = false;
+  bool _useGlassBar = true;
   String? _webError;
   Timer? _telemetryTimer;
   String _deviceId = '';
@@ -1949,6 +1950,16 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
     super.initState();
     unawaited(_setScreenSecurity(widget.devAntiScreenshot));
     WidgetsBinding.instance.addObserver(this);
+
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _useGlassBar = prefs.getBool('use_glass_bar') ??
+              prefs.getBool('use_liquid_glass') ??
+              true;
+        });
+      }
+    });
 
     // Kiosk Mode & Layar Penuh Immersive Sticky
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -2193,23 +2204,27 @@ class _ExamSessionPageState extends State<ExamSessionPage> with WidgetsBindingOb
                 right: 0,
                 child: Center(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(_useGlassBar ? 24 : 16),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      filter: ImageFilter.blur(sigmaX: _useGlassBar ? 10 : 0, sigmaY: _useGlassBar ? 10 : 0),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color.fromRGBO(15, 23, 42, 0.64),
-                          borderRadius: BorderRadius.circular(24),
+                          color: _useGlassBar
+                              ? const Color.fromRGBO(15, 23, 42, 0.64)
+                              : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(_useGlassBar ? 24 : 16),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.18),
+                            color: _useGlassBar
+                                ? Colors.white.withValues(alpha: 0.18)
+                                : const Color(0xFF334155),
                             width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
+                              color: Colors.black.withValues(alpha: _useGlassBar ? 0.25 : 0.45),
+                              blurRadius: _useGlassBar ? 16 : 10,
+                              offset: Offset(0, _useGlassBar ? 4 : 2),
                             ),
                           ],
                         ),
