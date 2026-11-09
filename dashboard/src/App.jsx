@@ -30,7 +30,14 @@ import {
   Lock,
   User,
   Zap,
-  Info
+  Info,
+  UserPlus,
+  Eye,
+  EyeOff,
+  Key,
+  GraduationCap,
+  ShieldAlert,
+  CheckCircle2
 } from 'lucide-react';
 
 // =========================================================================
@@ -124,6 +131,23 @@ export default function App() {
   const [loginPass, setLoginPass] = useState('rick');
   const [loginError, setLoginError] = useState('');
 
+  // Teachers & Staff Users State (User ID)
+  const [teachers, setTeachers] = useState([]);
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
+  const [userSearch, setUserSearch] = useState('');
+  const [viewAsRole, setViewAsRole] = useState('superadmin'); // 'superadmin' vs 'regular'
+  const [selectedTeacherForDetail, setSelectedTeacherForDetail] = useState(null);
+  const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
+  const [teacherNotification, setTeacherNotification] = useState('');
+  const [newTeacher, setNewTeacher] = useState({
+    name: '',
+    nip: '',
+    role: 'Guru Pengawas',
+    subject: '',
+    room: 'Ruang 01',
+    status: 'Aktif',
+  });
+
   const eventSourceRef = useRef(null);
 
   // Responsive detector
@@ -197,6 +221,28 @@ export default function App() {
       }
     };
   }, [token]);
+
+  // Fetch teachers from server
+  const fetchTeachers = async (roleView = viewAsRole) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/teachers?viewRole=${roleView}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.teachers) {
+        setTeachers(data.teachers);
+      }
+    } catch (err) {
+      console.error('Fetch teachers error:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchTeachers(viewAsRole);
+    }
+  }, [token, viewAsRole]);
 
   // Auto Stale Cleanup (Safely checks before updating state to avoid re-renders)
   useEffect(() => {
@@ -336,6 +382,153 @@ export default function App() {
       setTimeout(() => setCopiedEndpoint(false), 2000);
     });
   };
+
+  // Teacher & Staff Actions
+  const handleToggleTeacherStatus = async (id) => {
+    try {
+      const res = await fetch('/api/teachers/toggle-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setTeachers((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, status: data.user.status } : t))
+        );
+        if (selectedTeacherForDetail && selectedTeacherForDetail.id === id) {
+          setSelectedTeacherForDetail((prev) => ({ ...prev, status: data.user.status }));
+        }
+      } else if (data.error) {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error('Toggle status error:', err);
+    }
+  };
+
+  const handleResetTeacherPassword = async (teacher) => {
+    try {
+      const res = await fetch('/api/teachers/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: teacher.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.tempPassword) {
+        setTeacherNotification(
+          `Password sementara untuk ${teacher.name} berhasil direset: [ ${data.tempPassword} ]. Harap berikan kepada guru bersangkutan.`
+        );
+      }
+    } catch (err) {
+      console.error('Reset password error:', err);
+    }
+  };
+
+  const handleDeleteTeacher = async (id, name) => {
+    if (!confirm(`Hapus akun pengawas/guru "${name}"?`)) return;
+    try {
+      const res = await fetch('/api/teachers', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        setTeachers((prev) => prev.filter((t) => t.id !== id));
+        if (selectedTeacherForDetail && selectedTeacherForDetail.id === id) {
+          setSelectedTeacherForDetail(null);
+        }
+      }
+    } catch (err) {
+      console.error('Delete teacher error:', err);
+    }
+  };
+
+  const handleCreateTeacher = async (e) => {
+    e.preventDefault();
+    if (!newTeacher.name.trim()) return;
+    try {
+      const res = await fetch('/api/teachers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newTeacher),
+      });
+      const data = await res.json();
+      if (res.ok && data.teacher) {
+        setTeachers((prev) => [...prev, data.teacher]);
+        setShowAddTeacherModal(false);
+        setNewTeacher({
+          name: '',
+          nip: '',
+          role: 'Guru Pengawas',
+          subject: '',
+          room: 'Ruang 01',
+          status: 'Aktif',
+        });
+        setTeacherNotification(`Akun guru baru "${data.teacher.name}" (ID: ${data.teacher.id}) berhasil ditambahkan ke sistem!`);
+      }
+    } catch (err) {
+      console.error('Create teacher error:', err);
+    }
+  };
+
+  // Filtered teachers list with Developer Privacy Shield
+  const filteredTeachers = useMemo(() => {
+    return teachers.filter((t) => {
+      // PRIVACY SHIELD: If viewAsRole is regular, completely hide super-admin developer account
+      if (viewAsRole === 'regular' && t.isSuperAdmin) {
+        return false;
+      }
+
+      // Role filter
+      if (userRoleFilter === 'guru' && !t.role.toLowerCase().includes('guru')) return false;
+      if (userRoleFilter === 'proktor' && !t.role.toLowerCase().includes('proktor')) return false;
+      if (userRoleFilter === 'admin' && !t.role.toLowerCase().includes('admin kurikulum')) return false;
+      if (userRoleFilter === 'dev' && !t.isSuperAdmin) return false;
+
+      // Text search
+      if (userSearch.trim()) {
+        const q = userSearch.toLowerCase();
+        const matchName = (t.name || '').toLowerCase().includes(q);
+        const matchNip = (t.nip || '').toLowerCase().includes(q);
+        const matchId = (t.id || '').toLowerCase().includes(q);
+        const matchSubject = (t.subject || '').toLowerCase().includes(q);
+        const matchRoom = (t.room || '').toLowerCase().includes(q);
+        const matchRole = (t.role || '').toLowerCase().includes(q);
+        return matchName || matchNip || matchId || matchSubject || matchRoom || matchRole;
+      }
+
+      return true;
+    });
+  }, [teachers, viewAsRole, userRoleFilter, userSearch]);
+
+  const teacherRoleCounts = useMemo(() => {
+    const visibleTeachers = viewAsRole === 'regular' ? teachers.filter((t) => !t.isSuperAdmin) : teachers;
+    let total = visibleTeachers.length;
+    let guru = 0,
+      proktor = 0,
+      admin = 0,
+      dev = 0;
+    for (const t of visibleTeachers) {
+      if (t.isSuperAdmin) dev++;
+      else if (t.role.toLowerCase().includes('admin kurikulum')) admin++;
+      else if (t.role.toLowerCase().includes('proktor')) proktor++;
+      else guru++;
+    }
+    return { total, guru, proktor, admin, dev };
+  }, [teachers, viewAsRole]);
 
   // Metrics Count
   const counts = useMemo(() => {
@@ -953,75 +1146,289 @@ export default function App() {
                     <div className="api-badge online">Ready</div>
                   </div>
                 </Panel>
+
+                <Panel isGlass={liquidGlassEnabled} className="api-status-row">
+                  <div className="api-status-lead">
+                    <span className="api-method get">GET</span>
+                    <div>
+                      <div className="api-url">/api/teachers</div>
+                      <div className="api-desc">REST API akun guru & staf (Super-Admin otomatis disembunyikan untuk peran reguler)</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CopyButton text={`http://${window.location.host}/api/teachers`} label="Salin URL" />
+                    <div className="api-badge online">Active · Protected</div>
+                  </div>
+                </Panel>
               </div>
             </div>
           )}
 
           {/* =================================================================== */}
-          {/* TAB 5: USER (ID) / DATA SISWA TABLE                                 */}
+          {/* TAB 5: USER (ID) / DAFTAR AKUN GURU & PENGAWAS                      */}
           {/* =================================================================== */}
           {activeTab === 'users' && (
             <div className="tab-pane-content">
               <div className="workspace-header">
                 <div>
-                  <h1 className="workspace-title">Data Siswa & Perangkat (User ID)</h1>
-                  <p className="workspace-sub">Daftar lengkap sesi peserta ujian yang terdaftar saat ini.</p>
+                  <h1 className="workspace-title">Data Pengguna & Guru (User ID)</h1>
+                  <p className="workspace-sub">
+                    Daftar akun dewan guru pengawas, proktor ujian CBT, admin kurikulum, dan opsi proteksi akun Super-Admin.
+                  </p>
+                </div>
+                <div className="workspace-header-actions">
+                  <Button
+                    variant="filled"
+                    tint="#10B981"
+                    icon={<UserPlus size={16} />}
+                    onClick={() => setShowAddTeacherModal(true)}
+                  >
+                    + Tambah Akun Guru
+                  </Button>
                 </div>
               </div>
 
+              {/* ROLE PRIVACY SHIELD & SIMULATOR BANNER */}
+              <Panel isGlass={liquidGlassEnabled} className="privacy-guard-card">
+                <div className="privacy-guard-left">
+                  <div className="privacy-shield-icon">
+                    <ShieldAlert size={22} color="#10B981" />
+                  </div>
+                  <div>
+                    <div className="privacy-guard-title">
+                      <span>Proteksi Privasi Super-Admin & Developer Options</span>
+                      <span className="privacy-guard-badge">Privacy Shield Active</span>
+                    </div>
+                    <p className="privacy-guard-desc">
+                      Akun <strong>Super-Admin (rick)</strong> merupakan akun tingkat arsitek developer (Developer Root).
+                      Sesuai protokol privasi, identitas akun Super-Admin <strong>hanya terlihat saat Anda login sebagai Super-Admin</strong>.
+                      Peran Guru, Pengawas Ruang, dan Proktor biasa tidak dapat melihat akun maupun developer options ini.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="privacy-guard-toggle-box">
+                  <div className="privacy-toggle-label">Simulasi Pandangan Akses:</div>
+                  <div className="role-simulator-buttons">
+                    <button
+                      className={`sim-role-btn ${viewAsRole === 'superadmin' ? 'active-super' : ''}`}
+                      onClick={() => setViewAsRole('superadmin')}
+                      title="Lihat semua akun termasuk Super-Admin (Dev Mode)"
+                    >
+                      <Zap size={14} />
+                      <span>Mode Super-Admin (Dev)</span>
+                    </button>
+                    <button
+                      className={`sim-role-btn ${viewAsRole === 'regular' ? 'active-regular' : ''}`}
+                      onClick={() => setViewAsRole('regular')}
+                      title="Simulasi pandangan Guru / Pengawas biasa (Super-Admin disembunyikan otomatis)"
+                    >
+                      <EyeOff size={14} />
+                      <span>Pandangan Guru / Staf</span>
+                    </button>
+                  </div>
+                </div>
+              </Panel>
+
+              {/* Notification Toast Alert */}
+              {teacherNotification && (
+                <div className="teacher-toast-alert">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CheckCircle2 size={18} color="#10B981" />
+                    <span>{teacherNotification}</span>
+                  </div>
+                  <button
+                    onClick={() => setTeacherNotification('')}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-concrete)', cursor: 'pointer', fontSize: 16 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Filter & Search Bar */}
+              <Panel isGlass={liquidGlassEnabled} className="search-filter-panel">
+                <SearchField
+                  value={userSearch}
+                  onValueChange={setUserSearch}
+                  placeholder="Cari nama guru, NIP, user ID, mata pelajaran, ruang tugas..."
+                />
+
+                <div className="role-filter-chips">
+                  <button
+                    className={`role-filter-chip ${userRoleFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setUserRoleFilter('all')}
+                  >
+                    Semua ({teacherRoleCounts.total})
+                  </button>
+                  <button
+                    className={`role-filter-chip ${userRoleFilter === 'guru' ? 'active' : ''}`}
+                    onClick={() => setUserRoleFilter('guru')}
+                  >
+                    <GraduationCap size={13} />
+                    <span>Guru ({teacherRoleCounts.guru})</span>
+                  </button>
+                  <button
+                    className={`role-filter-chip ${userRoleFilter === 'proktor' ? 'active' : ''}`}
+                    onClick={() => setUserRoleFilter('proktor')}
+                  >
+                    <Server size={13} />
+                    <span>Proktor ({teacherRoleCounts.proktor})</span>
+                  </button>
+                  <button
+                    className={`role-filter-chip ${userRoleFilter === 'admin' ? 'active' : ''}`}
+                    onClick={() => setUserRoleFilter('admin')}
+                  >
+                    <ShieldCheck size={13} />
+                    <span>Admin ({teacherRoleCounts.admin})</span>
+                  </button>
+                  {viewAsRole === 'superadmin' && (
+                    <button
+                      className={`role-filter-chip ${userRoleFilter === 'dev' ? 'active' : ''}`}
+                      onClick={() => setUserRoleFilter('dev')}
+                    >
+                      <Zap size={13} />
+                      <span>Developer ({teacherRoleCounts.dev})</span>
+                    </button>
+                  )}
+                </div>
+              </Panel>
+
+              {/* Teacher & Staff Table */}
               <Panel isGlass={liquidGlassEnabled} className="user-table-wrapper">
                 <table className="user-data-table">
                   <thead>
                     <tr>
-                      <th>Device ID</th>
-                      <th>Nama Siswa</th>
-                      <th>Kelas</th>
-                      <th>Perangkat</th>
-                      <th>Status Ujian</th>
-                      <th>Baterai</th>
-                      <th>Ping</th>
+                      <th>User ID</th>
+                      <th>Nama Pengguna / Guru</th>
+                      <th>Role / Peran</th>
+                      <th>Mata Pelajaran / Tugas</th>
+                      <th>Ruang Penugasan</th>
+                      <th>Status Akun</th>
+                      <th>Terakhir Login</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {students.length === 0 ? (
+                    {filteredTeachers.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--text-concrete)' }}>
-                          Belum ada data siswa aktif. Buka APK atau nyalakan mode Demo.
+                        <td colSpan={8} style={{ textAlign: 'center', padding: 36, color: 'var(--text-concrete)' }}>
+                          Tidak ada akun guru/staf yang cocok dengan pencarian atau filter.
                         </td>
                       </tr>
                     ) : (
-                      students.map((s) => {
-                        const meta = getStatusPresentation(s.status, s.leaveCount);
+                      filteredTeachers.map((t) => {
+                        const isDev = t.isSuperAdmin;
+                        const roleLower = (t.role || '').toLowerCase();
+                        const roleClass = isDev
+                          ? 'dev'
+                          : roleLower.includes('admin')
+                          ? 'admin'
+                          : roleLower.includes('proktor')
+                          ? 'proktor'
+                          : 'guru';
+
                         return (
-                          <tr key={s.deviceId}>
-                            <td className="code-font">{s.deviceId}</td>
-                            <td style={{ fontWeight: 700 }}>{s.name}</td>
-                            <td>{s.className}</td>
-                            <td>{s.deviceLabel}</td>
+                          <tr key={t.id} className={isDev ? 'super-admin-row' : ''}>
+                            {/* User ID */}
                             <td>
-                              <span className={`table-status-pill ${meta.className}`}>
-                                {meta.title}
+                              <div className="code-font" style={{ fontWeight: 700, color: isDev ? '#34d399' : 'inherit' }}>
+                                {t.id}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-concrete)' }}>
+                                @{t.username || t.id.toLowerCase()}
+                              </div>
+                            </td>
+
+                            {/* Nama & NIP */}
+                            <td>
+                              <div className="user-identity-cell">
+                                <div className={`user-avatar-circle ${isDev ? 'dev' : ''}`}>
+                                  {isDev ? '⚡' : (t.name || 'G')[0]}
+                                </div>
+                                <div>
+                                  <div className="user-primary-name">{t.name}</div>
+                                  <div className="user-sub-nip">NIP: {t.nip || '-'}</div>
+                                  {isDev && (
+                                    <div className="dev-tag-pill">
+                                      <Zap size={10} />
+                                      <span>Developer Options Root (Hidden from regular roles)</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Role / Peran */}
+                            <td>
+                              <span className={`role-badge ${roleClass}`}>
+                                {isDev && <Zap size={12} />}
+                                {!isDev && roleClass === 'admin' && <ShieldCheck size={12} />}
+                                {!isDev && roleClass === 'proktor' && <Server size={12} />}
+                                {!isDev && roleClass === 'guru' && <GraduationCap size={12} />}
+                                <span>{t.role}</span>
                               </span>
                             </td>
-                            <td>{s.isCharging ? '⚡ ' : ''}{s.batteryLevel || 100}%</td>
-                            <td className="color-green">{s.pingMs || 9}ms</td>
+
+                            {/* Mapel / Tugas */}
                             <td>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                {s.status === 'terkunci' && (
-                                  <button
-                                    className="table-action-btn danger"
-                                    onClick={() => handleRemoteUnlock(s.deviceId)}
-                                  >
-                                    Buka Kunci
-                                  </button>
-                                )}
+                              <div style={{ fontWeight: 600 }}>{t.subject || '-'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-concrete)' }}>
+                                {t.privilege || 'Hak Akses Standar'}
+                              </div>
+                            </td>
+
+                            {/* Ruang Tugas */}
+                            <td>
+                              <span className="class-pill">{t.room || 'Ruang 01'}</span>
+                            </td>
+
+                            {/* Status Akun (Interactive Toggle) */}
+                            <td>
+                              <button
+                                className={`status-toggle-pill ${t.status === 'Aktif' ? 'active' : 'inactive'}`}
+                                onClick={() => handleToggleTeacherStatus(t.id)}
+                                title={isDev ? 'Status Super-Admin tidak dapat diubah' : 'Klik untuk mengubah status'}
+                                disabled={isDev}
+                              >
+                                <span className="status-dot"></span>
+                                <span>{t.status}</span>
+                              </button>
+                            </td>
+
+                            {/* Terakhir Login */}
+                            <td style={{ fontSize: 12, color: 'var(--text-concrete)' }}>
+                              {t.lastLogin || 'Hari ini'}
+                            </td>
+
+                            {/* Aksi */}
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                 <button
                                   className="table-action-btn"
-                                  onClick={() => setSelectedStudentId(s.deviceId)}
+                                  onClick={() => setSelectedTeacherForDetail(t)}
+                                  title="Lihat detail hak akses guru"
                                 >
                                   Detail
                                 </button>
+                                {!isDev && (
+                                  <button
+                                    className="table-action-btn"
+                                    onClick={() => handleResetTeacherPassword(t)}
+                                    title="Reset password ke sandi sementara"
+                                  >
+                                    Reset PIN
+                                  </button>
+                                )}
+                                {!isDev && (
+                                  <button
+                                    className="table-action-btn danger"
+                                    onClick={() => handleDeleteTeacher(t.id, t.name)}
+                                    title="Hapus akun guru"
+                                  >
+                                    Hapus
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1331,6 +1738,239 @@ export default function App() {
                 Tutup
               </Button>
             </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: DETAIL AKUN GURU & HAK AKSES                                    */}
+      {/* ===================================================================== */}
+      {selectedTeacherForDetail && (
+        <div className="modal-backdrop" onClick={() => setSelectedTeacherForDetail(null)}>
+          <Panel isGlass={liquidGlassEnabled} className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  className={`user-avatar-circle ${selectedTeacherForDetail.isSuperAdmin ? 'dev' : ''}`}
+                  style={{ width: 44, height: 44, fontSize: 16 }}
+                >
+                  {selectedTeacherForDetail.isSuperAdmin ? '⚡' : (selectedTeacherForDetail.name || 'G')[0]}
+                </div>
+                <div>
+                  <div className="modal-name">{selectedTeacherForDetail.name}</div>
+                  <div className="modal-sub">
+                    ID: {selectedTeacherForDetail.id} · NIP: {selectedTeacherForDetail.nip || '-'}
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="glass"
+                onClick={() => setSelectedTeacherForDetail(null)}
+                style={{ width: 36, height: 36, padding: 0 }}
+              >
+                ✕
+              </Button>
+            </div>
+
+            {selectedTeacherForDetail.isSuperAdmin && (
+              <div
+                className="locked-warning-banner"
+                style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+              >
+                <Zap size={20} color="#10B981" />
+                <div>
+                  <strong style={{ color: '#34d399' }}>Akun Developer Root (Super-Admin)</strong>
+                  <div style={{ fontSize: 12, marginTop: 2, color: 'var(--text-concrete)' }}>
+                    Akun ini memegang hak akses penuh arsitektur sistem. Akun ini tidak dapat dihapus dan otomatis disembunyikan dari peran Guru dan Pengawas biasa demi privasi.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--text-concrete)', textTransform: 'uppercase' }}>
+              RINCIAN PENUGASAN & HAK AKSES SISTEM
+            </div>
+
+            <div className="modal-quad-grid">
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
+                <div className="quad-label">
+                  <ShieldCheck size={16} />
+                  <span>Peran / Role</span>
+                </div>
+                <div className="quad-value" style={{ fontSize: 15 }}>{selectedTeacherForDetail.role}</div>
+                <div className="quad-desc">Tingkat Otoritas Sistem</div>
+              </Panel>
+
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
+                <div className="quad-label">
+                  <GraduationCap size={16} />
+                  <span>Mata Pelajaran</span>
+                </div>
+                <div className="quad-value" style={{ fontSize: 15 }}>{selectedTeacherForDetail.subject}</div>
+                <div className="quad-desc">Bidang Ujian Diampu</div>
+              </Panel>
+
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
+                <div className="quad-label">
+                  <Monitor size={16} />
+                  <span>Ruang Penugasan</span>
+                </div>
+                <div className="quad-value" style={{ fontSize: 15 }}>{selectedTeacherForDetail.room}</div>
+                <div className="quad-desc">Lokasi Pengawasan CBT</div>
+              </Panel>
+
+              <Panel isGlass={liquidGlassEnabled} className="quad-cell">
+                <div className="quad-label">
+                  <Key size={16} />
+                  <span>Status Akun</span>
+                </div>
+                <div
+                  className="quad-value"
+                  style={{
+                    fontSize: 15,
+                    color: selectedTeacherForDetail.status === 'Aktif' ? 'var(--status-green)' : 'var(--text-concrete)',
+                  }}
+                >
+                  {selectedTeacherForDetail.status}
+                </div>
+                <div className="quad-desc">Kesiapan Login Petugas</div>
+              </Panel>
+            </div>
+
+            <div className="banner-card-body" style={{ background: 'rgba(24, 24, 27, 0.6)', padding: 14, borderRadius: 14, marginTop: 12 }}>
+              <div className="info-stat-row">
+                <span>Hak Otoritas & Akses</span>
+                <strong>{selectedTeacherForDetail.privilege || 'Presensi & Pengawasan Standar'}</strong>
+              </div>
+              <div className="info-stat-row">
+                <span>Terakhir Login</span>
+                <strong>{selectedTeacherForDetail.lastLogin || 'Hari ini'}</strong>
+              </div>
+              <div className="info-stat-row">
+                <span>Username Sistem</span>
+                <strong className="code-font">@{selectedTeacherForDetail.username || selectedTeacherForDetail.id.toLowerCase()}</strong>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              {!selectedTeacherForDetail.isSuperAdmin && (
+                <>
+                  <Button
+                    variant="glass"
+                    onClick={() => handleToggleTeacherStatus(selectedTeacherForDetail.id)}
+                  >
+                    {selectedTeacherForDetail.status === 'Aktif' ? 'Nonaktifkan Akun' : 'Aktifkan Akun'}
+                  </Button>
+                  <Button
+                    variant="glass"
+                    tint="#F59E0B"
+                    onClick={() => {
+                      handleResetTeacherPassword(selectedTeacherForDetail);
+                      setSelectedTeacherForDetail(null);
+                    }}
+                  >
+                    Reset Password
+                  </Button>
+                </>
+              )}
+              <Button variant="glass" onClick={() => setSelectedTeacherForDetail(null)}>
+                Tutup
+              </Button>
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: TAMBAH AKUN GURU BARU                                          */}
+      {/* ===================================================================== */}
+      {showAddTeacherModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddTeacherModal(false)}>
+          <Panel isGlass={liquidGlassEnabled} className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-name">Tambah Akun Guru / Petugas Baru</div>
+                <div className="modal-sub">Daftarkan dewan guru, proktor, atau pengawas ujian baru ke sistem.</div>
+              </div>
+              <Button
+                variant="glass"
+                onClick={() => setShowAddTeacherModal(false)}
+                style={{ width: 36, height: 36, padding: 0 }}
+              >
+                ✕
+              </Button>
+            </div>
+
+            <form onSubmit={handleCreateTeacher} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">Nama Lengkap & Gelar</label>
+                <Input
+                  value={newTeacher.name}
+                  onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, name: val }))}
+                  placeholder="Contoh: Siti Fatimah, S.Pd"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">NIP / NUPTK / Kode Guru</label>
+                <Input
+                  value={newTeacher.nip}
+                  onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, nip: val }))}
+                  placeholder="Contoh: 19890415 201201 2 007"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Peran / Role</label>
+                <select
+                  className="form-select-input"
+                  value={newTeacher.role}
+                  onChange={(e) => setNewTeacher((prev) => ({ ...prev, role: e.target.value }))}
+                >
+                  <option value="Guru Pengawas">👨‍🏫 Guru Pengawas</option>
+                  <option value="Proktor Utama">🛡️ Proktor Utama</option>
+                  <option value="Proktor Cadangan">🛡️ Proktor Cadangan</option>
+                  <option value="Admin Kurikulum">📋 Admin Kurikulum</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Mata Pelajaran Diampu</label>
+                <Input
+                  value={newTeacher.subject}
+                  onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, subject: val }))}
+                  placeholder="Contoh: Matematika Peminatan (Kelas XI)"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ruang Penugasan Ujian</label>
+                <select
+                  className="form-select-input"
+                  value={newTeacher.room}
+                  onChange={(e) => setNewTeacher((prev) => ({ ...prev, room: e.target.value }))}
+                >
+                  <option value="Ruang Ujian 01">Ruang Ujian 01</option>
+                  <option value="Ruang Ujian 02">Ruang Ujian 02</option>
+                  <option value="Ruang Ujian 03">Ruang Ujian 03</option>
+                  <option value="Ruang Ujian 04">Ruang Ujian 04</option>
+                  <option value="Ruang Ujian 05">Ruang Ujian 05</option>
+                  <option value="Lab Komputer 1">Lab Komputer 1</option>
+                  <option value="Lab Multimedia">Lab Multimedia</option>
+                  <option value="Ruang Kurikulum">Ruang Kurikulum</option>
+                </select>
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: 10 }}>
+                <Button variant="glass" type="button" onClick={() => setShowAddTeacherModal(false)}>
+                  Batal
+                </Button>
+                <Button variant="filled" tint="#10B981" type="submit">
+                  Simpan Akun Guru
+                </Button>
+              </div>
+            </form>
           </Panel>
         </div>
       )}

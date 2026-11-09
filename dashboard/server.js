@@ -16,6 +16,129 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const ADMIN_USER = 'rick';
 const ADMIN_PASS = 'rick';
 
+// Staff / Teachers & Pengawas Registry
+// Privacy Rule: Super-admin account (isSuperAdmin: true) is Developer-only
+// and MUST NEVER be exposed to regular roles (Guru, Pengawas, etc.)
+let staffUsers = [
+  {
+    id: 'DEV-001',
+    username: 'rick',
+    name: 'Rick Sanchez (Developer Root)',
+    nip: 'DEV-ROOT-001',
+    role: 'Super-Admin (Developer)',
+    subject: 'System Architecture & Dev Options',
+    room: 'Ruang Server Pusat',
+    status: 'Aktif',
+    privilege: 'Akses Penuh Root & Bypass Kiosk',
+    lastLogin: 'Baru saja',
+    isSuperAdmin: true,
+  },
+  {
+    id: 'ADM-101',
+    username: 'hendra.gunawan',
+    name: 'Drs. Hendra Gunawan, M.Pd',
+    nip: '19790514 200501 1 008',
+    role: 'Admin Kurikulum',
+    subject: 'Koordinator Bank Soal & Jadwal',
+    room: 'Ruang Kurikulum',
+    status: 'Aktif',
+    privilege: 'Kelola Jadwal, Token, & Nilai',
+    lastLogin: '10 menit lalu',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'PRK-201',
+    username: 'siti.nurhaliza',
+    name: 'Siti Nurhaliza, S.Kom',
+    nip: '19850320 200902 2 004',
+    role: 'Proktor Utama',
+    subject: 'Server CBT & Lab Komputer',
+    room: 'Lab Komputer 1',
+    status: 'Aktif',
+    privilege: 'Sinkronisasi Token & Restart Sesi',
+    lastLogin: '3 menit lalu',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'PRK-202',
+    username: 'doni.pratama',
+    name: 'Doni Pratama, S.T',
+    nip: '19940115 201903 1 007',
+    role: 'Proktor Cadangan',
+    subject: 'Teknis Jaringan & Perangkat',
+    room: 'Lab Multimedia',
+    status: 'Aktif',
+    privilege: 'Infrastruktur LAN & Kiosk APK',
+    lastLogin: '1 jam lalu',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'GRU-301',
+    username: 'budi.santoso',
+    name: 'Budi Santoso, S.Pd',
+    nip: '19821105 200801 1 012',
+    role: 'Guru Pengawas',
+    subject: 'Matematika Peminatan & Wajib',
+    room: 'Ruang Ujian 01',
+    status: 'Aktif',
+    privilege: 'Presensi & Pengawasan Ruang 01',
+    lastLogin: '25 menit lalu',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'GRU-302',
+    username: 'dewi.lestari',
+    name: 'Dewi Lestari, M.Si',
+    nip: '19880719 201101 2 009',
+    role: 'Guru Pengawas',
+    subject: 'Fisika & Kimia IPA',
+    room: 'Ruang Ujian 02',
+    status: 'Aktif',
+    privilege: 'Presensi & Pengawasan Ruang 02',
+    lastLogin: '45 menit lalu',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'GRU-303',
+    username: 'ahmad.fauzi',
+    name: 'Ahmad Fauzi, S.Pd',
+    nip: '19910412 201502 1 003',
+    role: 'Guru Pengawas',
+    subject: 'Bahasa Indonesia & Sastra',
+    room: 'Ruang Ujian 03',
+    status: 'Aktif',
+    privilege: 'Presensi & Pengawasan Ruang 03',
+    lastLogin: 'Hari ini, 07:15',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'GRU-304',
+    username: 'rina.agustina',
+    name: 'Rina Agustina, S.Pd',
+    nip: '19890928 201403 2 006',
+    role: 'Guru Pengawas',
+    subject: 'Bahasa Inggris Wajib',
+    room: 'Ruang Ujian 04',
+    status: 'Nonaktif',
+    privilege: 'Cuti Dinas / Pengawas Pengganti',
+    lastLogin: '3 hari lalu',
+    isSuperAdmin: false,
+  },
+  {
+    id: 'GRU-305',
+    username: 'hartono.pai',
+    name: 'Drs. H. Hartono, M.Ag',
+    nip: '19750208 200212 1 002',
+    role: 'Guru Pengawas',
+    subject: 'Pendidikan Agama & Budi Pekerti',
+    room: 'Ruang Ujian 05',
+    status: 'Aktif',
+    privilege: 'Presensi & Pengawasan Ruang 05',
+    lastLogin: 'Hari ini, 07:30',
+    isSuperAdmin: false,
+  },
+];
+
 // In-memory active tokens & student state
 const activeTokens = new Set();
 const students = new Map(); // key: deviceId, value: StudentData
@@ -247,6 +370,77 @@ const server = http.createServer(async (req, res) => {
       stopSimulator();
     }
     return sendJson(res, 200, { running: !!simulatorInterval, count: students.size });
+  }
+
+  // 8. Staff / Teachers & Pengawas Management (User ID)
+  // PRIVACY RULE: If viewRole is regular/guru/proktor/admin, Super-Admin dev account is HIDDEN!
+  if (pathname === '/api/teachers' && req.method === 'GET') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    const viewRole = urlObj.searchParams.get('viewRole') || req.headers['x-view-role'] || 'superadmin';
+    const isSuperAdminView = viewRole === 'superadmin';
+    const list = isSuperAdminView ? staffUsers : staffUsers.filter(u => !u.isSuperAdmin);
+    return sendJson(res, 200, {
+      success: true,
+      viewRole,
+      superAdminHidden: !isSuperAdminView,
+      teachers: list,
+    });
+  }
+
+  if (pathname === '/api/teachers' && req.method === 'POST') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    const payload = await parseBody(req);
+    if (!payload.name) return sendJson(res, 400, { error: 'Nama guru wajib diisi' });
+    
+    const newId = payload.id || `GRU-${String(staffUsers.length + 301).padStart(3, '0')}`;
+    const newUser = {
+      id: newId,
+      username: (payload.username || payload.name.toLowerCase().replace(/[^a-z0-9]/g, '.')).slice(0, 20),
+      name: payload.name,
+      nip: payload.nip || '-',
+      role: payload.role || 'Guru Pengawas',
+      subject: payload.subject || 'Mata Pelajaran Umum',
+      room: payload.room || 'Ruang 01',
+      status: payload.status || 'Aktif',
+      privilege: payload.privilege || 'Presensi & Pengawasan Ruang',
+      lastLogin: 'Belum pernah',
+      isSuperAdmin: false,
+    };
+    staffUsers.push(newUser);
+    return sendJson(res, 201, { success: true, teacher: newUser });
+  }
+
+  if (pathname === '/api/teachers/toggle-status' && req.method === 'POST') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    const { id } = await parseBody(req);
+    const user = staffUsers.find(u => u.id === id);
+    if (!user) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
+    if (user.isSuperAdmin) return sendJson(res, 403, { error: 'Status Super-Admin tidak dapat dinonaktifkan' });
+    user.status = user.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+    return sendJson(res, 200, { success: true, user });
+  }
+
+  if (pathname === '/api/teachers/reset-password' && req.method === 'POST') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    const { id } = await parseBody(req);
+    const user = staffUsers.find(u => u.id === id);
+    if (!user) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
+    const tempPass = 'UK-' + Math.floor(100000 + Math.random() * 900000);
+    return sendJson(res, 200, {
+      success: true,
+      message: `Password akun ${user.name} berhasil direset!`,
+      tempPassword: tempPass,
+    });
+  }
+
+  if (pathname === '/api/teachers' && req.method === 'DELETE') {
+    if (!checkAuth(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    const { id } = await parseBody(req);
+    const target = staffUsers.find(u => u.id === id);
+    if (!target) return sendJson(res, 404, { error: 'Pengguna tidak ditemukan' });
+    if (target.isSuperAdmin) return sendJson(res, 403, { error: 'Super-Admin tidak dapat dihapus!' });
+    staffUsers = staffUsers.filter(u => u.id !== id);
+    return sendJson(res, 200, { success: true });
   }
 
   // --- STATIC FILE SERVING ---
