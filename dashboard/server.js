@@ -358,6 +358,7 @@ async function requestHandler(req, res) {
 
   // 0. Server Health & Realtime Communication Status Check
   if (pathname === '/api/health' && req.method === 'GET') {
+    await syncGoogleTeachers();
     return sendJson(res, 200, {
       status: 'online',
       message: 'Server Realtime Terhubung & Siap Berkomunikasi',
