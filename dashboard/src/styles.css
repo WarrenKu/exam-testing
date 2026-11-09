@@ -285,6 +285,54 @@ body {
   gap: 16px;
 }
 
+/* Mobile Header Brand & Profile (Petir Badge + Nama disamping + Role dibawah) */
+.mobile-header-brand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-brand-lightning {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1.5px solid rgba(16, 185, 129, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.28);
+  flex-shrink: 0;
+}
+
+.mobile-profile-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.15;
+}
+
+.mobile-profile-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #F0EFEA;
+  letter-spacing: 0.2px;
+}
+
+.mobile-profile-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: #10B981;
+  text-transform: capitalize;
+  margin-top: 1px;
+}
+
+.desktop-status-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .mobile-only-brand {
   display: none;
   align-items: center;
@@ -406,6 +454,16 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.summary-section.two-cards {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+}
+
+@media (max-width: 640px) {
+  .summary-section.two-cards {
+    grid-template-columns: 1fr;
+  }
 }
 
 .stat-card {
@@ -1041,6 +1099,32 @@ body {
   background: linear-gradient(135deg, rgba(22, 22, 25, 0.95), rgba(15, 23, 20, 0.9));
   border: 1px solid rgba(16, 185, 129, 0.25);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.privacy-guard-card.super-hebat-mode {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(2, 132, 199, 0.12)) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.45) !important;
+  box-shadow: 0 4px 24px rgba(16, 185, 129, 0.22) !important;
+}
+
+.privacy-guard-card.warning-global-mode {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(24, 24, 27, 0.95)) !important;
+  border: 1.5px solid rgba(245, 158, 11, 0.45) !important;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.18) !important;
+}
+
+.badge-super {
+  background: rgba(16, 185, 129, 0.22) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.5) !important;
+  font-weight: 800 !important;
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.22) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.5) !important;
+  font-weight: 800 !important;
 }
 
 .privacy-guard-left {
@@ -2041,8 +2125,16 @@ body {
     display: none !important; /* Menu moved to bottom navigation bar on mobile */
   }
 
-  .mobile-only-brand {
-    display: flex;
+  .mobile-header-brand {
+    display: flex !important;
+  }
+
+  .desktop-status-group {
+    display: none !important;
+  }
+
+  .admin-avatar-pill {
+    display: none !important;
   }
 
   .admin-topbar {

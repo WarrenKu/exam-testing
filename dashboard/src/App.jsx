@@ -920,29 +920,37 @@ export default function App() {
         {/* Top Header */}
         <header className="admin-topbar">
           <div className="topbar-left">
-            <div className="mobile-only-brand">
-              <span className="brand-dot"></span>
-              <strong>UjianKita</strong>
+            {/* Mobile Branding: Petir Logo Badge + Nama (disamping) & Role (dibawahnya) */}
+            <div className="mobile-header-brand">
+              <div className="mobile-brand-lightning">
+                <Zap size={18} color="#10B981" />
+              </div>
+              <div className="mobile-profile-info">
+                <div className="mobile-profile-name">{user?.username || 'rick'}</div>
+                <div className="mobile-profile-role">{user?.role || 'Super-Admin'}</div>
+              </div>
             </div>
-            <div className="live-pill">
-              <span className="pulse-dot"></span>
-              <span>LIVE SERVER</span>
+
+            {/* Desktop Server & Clock Status */}
+            <div className="desktop-status-group">
+              <div className="live-pill">
+                <span className="pulse-dot"></span>
+                <span>LIVE SERVER</span>
+              </div>
+              <LiveClock />
             </div>
-            <LiveClock />
           </div>
 
           <div className="topbar-right">
-            {/* Quick Demo Switch */}
-            <div className="topbar-demo-switch">
-              <span style={{ fontSize: 12, color: 'var(--text-concrete)' }}>Demo:</span>
-              <Switch
-                aria-label="Toggle Demo Siswa"
-                checked={simulatorRunning}
-                onCheckedChange={handleToggleSimulator}
-              />
-            </div>
+            {/* On Mobile, show LIVE pill on the right cleanly */}
+            {isMobile && (
+              <div className="live-pill" style={{ padding: '4px 10px', fontSize: 11 }}>
+                <span className="pulse-dot"></span>
+                <span>LIVE</span>
+              </div>
+            )}
 
-            {/* Kelvin Zhang Glisse Menu Component (Desktop Only - Dipindahkan ke companion bar di mobile sesuai panah biru) */}
+            {/* Kelvin Zhang Glisse Menu Component (Desktop Only - Dipindahkan ke companion bar di mobile) */}
             {!isMobile && (
               <div className="topbar-menu-wrapper desktop-only-menu">
                 <Menu
@@ -952,10 +960,13 @@ export default function App() {
               </div>
             )}
 
-            <div className="admin-avatar-pill">
-              <div className="profile-mini-avatar">R</div>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>rick</span>
-            </div>
+            {/* Avatar Pill (Desktop Only - Pada Mobile sudah ada di samping petir) */}
+            {!isMobile && (
+              <div className="admin-avatar-pill">
+                <div className="profile-mini-avatar">R</div>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{user?.username || 'rick'}</span>
+              </div>
+            )}
           </div>
         </header>
 
@@ -973,8 +984,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Summary Metrics Section (UI Sebelumnya) */}
-              <div className="summary-section">
+              {/* Summary Metrics Section (Hanya Total & Selesai Ujian) */}
+              <div className="summary-section two-cards">
                 <Panel
                   isGlass={liquidGlassEnabled}
                   className="stat-card"
@@ -988,75 +999,24 @@ export default function App() {
                   </div>
                   <div className="stat-info">
                     <div className="stat-value">{counts.total}</div>
-                    <div className="stat-label">Total Siswa Aktif</div>
+                    <div className="stat-label">Total Peserta Ujian</div>
                   </div>
                 </Panel>
 
                 <Panel
                   isGlass={liquidGlassEnabled}
-                  className="stat-card"
-                  onClick={() => {
-                    setActiveTab('monitoring');
-                    setFilter('mengerjakan');
-                  }}
-                >
-                  <div className="stat-icon-wrap green-icon">
-                    <span className="status-dot green-dot"></span>
-                  </div>
-                  <div className="stat-info">
-                    <div className="stat-value text-green">{counts.mengerjakan}</div>
-                    <div className="stat-label">🟢 Mengerjakan</div>
-                  </div>
-                </Panel>
-
-                <Panel
-                  isGlass={liquidGlassEnabled}
-                  className="stat-card"
-                  onClick={() => {
-                    setActiveTab('monitoring');
-                    setFilter('keluar');
-                  }}
-                >
-                  <div className="stat-icon-wrap yellow-icon">
-                    <span className="status-dot yellow-dot"></span>
-                  </div>
-                  <div className="stat-info">
-                    <div className="stat-value text-yellow">{counts.keluar}</div>
-                    <div className="stat-label">🟡 Keluar Aplikasi</div>
-                  </div>
-                </Panel>
-
-                <Panel
-                  isGlass={liquidGlassEnabled}
-                  className="stat-card"
-                  onClick={() => {
-                    setActiveTab('monitoring');
-                    setFilter('terkunci');
-                  }}
-                >
-                  <div className="stat-icon-wrap red-icon">
-                    <span className="status-dot red-dot"></span>
-                  </div>
-                  <div className="stat-info">
-                    <div className="stat-value text-red">{counts.terkunci}</div>
-                    <div className="stat-label">🔴 Sesi Terkunci</div>
-                  </div>
-                </Panel>
-
-                <Panel
-                  isGlass={liquidGlassEnabled}
-                  className="stat-card"
+                  className="stat-card active-highlight"
                   onClick={() => {
                     setActiveTab('monitoring');
                     setFilter('selesai');
                   }}
                 >
                   <div className="stat-icon-wrap blue-icon">
-                    <span className="status-dot blue-dot"></span>
+                    <CheckCircle2 size={22} color="#38BDF8" />
                   </div>
                   <div className="stat-info">
                     <div className="stat-value text-blue">{counts.selesai}</div>
-                    <div className="stat-label">🔵 Selesai Ujian</div>
+                    <div className="stat-label">🔵 Selesai Ujian (Terkirim)</div>
                   </div>
                 </Panel>
               </div>
@@ -1183,7 +1143,7 @@ export default function App() {
                   </div>
                   <div className="empty-title">Belum Ada Siswa Aktif</div>
                   <div className="empty-desc">
-                    Buka aplikasi Android UjianKita siswa atau aktifkan tombol <strong>"Demo"</strong> di kanan atas.
+                    Buka aplikasi Android UjianKita pada tablet/HP siswa untuk menghubungkan sesi ujian secara realtime.
                   </div>
                 </Panel>
               ) : (
@@ -1423,21 +1383,35 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ROLE PRIVACY SHIELD & SIMULATOR BANNER */}
-              <Panel isGlass={liquidGlassEnabled} className="privacy-guard-card">
+              {/* ROLE PRIVACY SHIELD & SUPER-ADMIN BANNER */}
+              <Panel isGlass={liquidGlassEnabled} className={`privacy-guard-card ${viewAsRole === 'superadmin' ? 'super-hebat-mode' : 'warning-global-mode'}`}>
                 <div className="privacy-guard-left">
                   <div className="privacy-shield-icon">
-                    <ShieldAlert size={22} color="#10B981" />
+                    {viewAsRole === 'superadmin' ? (
+                      <Zap size={24} color="#10B981" />
+                    ) : (
+                      <ShieldAlert size={24} color="#F59E0B" />
+                    )}
                   </div>
                   <div>
                     <div className="privacy-guard-title">
-                      <span>Proteksi Privasi Super-Admin & Developer Options</span>
-                      <span className="privacy-guard-badge">Privacy Shield Active</span>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: viewAsRole === 'superadmin' ? '#10B981' : '#F59E0B' }}>
+                        {viewAsRole === 'superadmin' ? 'KAMU HEBAT' : 'PERINGATAN: AREA TERPROTEKSI'}
+                      </span>
+                      <span className={`privacy-guard-badge ${viewAsRole === 'superadmin' ? 'badge-super' : 'badge-warning'}`}>
+                        {viewAsRole === 'superadmin' ? '🌟 Super-Admin Root' : '⚠️ Otoritas Terbatas'}
+                      </span>
                     </div>
                     <p className="privacy-guard-desc">
-                      Akun <strong>Super-Admin (rick)</strong> merupakan akun tingkat arsitek developer (Developer Root).
-                      Sesuai protokol privasi, identitas akun Super-Admin <strong>hanya terlihat saat Anda login sebagai Super-Admin</strong>.
-                      Peran Guru, Pengawas Ruang, dan Proktor biasa tidak dapat melihat akun maupun developer options ini.
+                      {viewAsRole === 'superadmin' ? (
+                        <>
+                          Akses <strong>Super-Admin (rick)</strong> aktif! Seluruh kontrol pengawasan CBT, bypass kiosk, dan wewenang akun dewan guru berada dalam kendali penuhmu.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Peringatan Privasi:</strong> Akun tingkat developer (Super-Admin) disembunyikan secara otomatis. Anda beroperasi di bawah tampilan dan wewenang guru/pengawas ruang standar.
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1537,7 +1511,7 @@ export default function App() {
                       <th>User ID & NSID</th>
                       <th>Nama Pengguna / Guru</th>
                       <th>Role / Peran</th>
-                      <th>Mata Pelajaran & Kelas Diampu</th>
+                      <th>MATA PELAJARAN</th>
                       <th>Otoritas & Hak Akses</th>
                       <th>Status Akun</th>
                       <th>Terakhir Login</th>
@@ -1772,22 +1746,7 @@ export default function App() {
 
                 <div className="setting-sep"></div>
 
-                {/* 2. SIMULATOR TOGGLE */}
-                <div className="setting-row">
-                  <div className="setting-info">
-                    <h4>Simulasi Data Ujian Siswa (Demo Mode)</h4>
-                    <p>Jalankan 8 profil siswa virtual dengan beragam status ujian untuk demonstrasi.</p>
-                  </div>
-                  <Switch
-                    aria-label="Toggle Demo Siswa"
-                    checked={simulatorRunning}
-                    onCheckedChange={handleToggleSimulator}
-                  />
-                </div>
-
-                <div className="setting-sep"></div>
-
-                {/* 3. SOUND ALERT TOGGLE */}
+                {/* 2. SOUND ALERT TOGGLE */}
                 <div className="setting-row">
                   <div className="setting-info">
                     <h4>Suara Alarm Pelanggaran</h4>
@@ -2249,34 +2208,13 @@ export default function App() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Mata Pelajaran yang Diampu</label>
+                <label className="form-label">MATA PELAJARAN</label>
                 <Input
                   value={newTeacher.subject}
                   onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, subject: val }))}
-                  placeholder="Contoh: MATEMATIKA atau FISIKA & KIMIA"
+                  placeholder="Contoh: MATEMATIKA XI.4"
                   required
                 />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Kelas / Rombel yang Diampu</label>
-                <Input
-                  value={newTeacher.classes || ''}
-                  onValueChange={(val) => setNewTeacher((prev) => ({ ...prev, classes: val }))}
-                  placeholder="Contoh: XI.1 - XI.4 (atau Semua Kelas X)"
-                />
-                <div style={{ fontSize: 11, color: 'var(--text-concrete)', marginTop: 4 }}>
-                  💡 Ruang ujian bersifat dinamis & berganti setiap sesi. Identitas penugasan difokuskan pada Mata Pelajaran dan Kelas yang diampu guru.
-                </div>
-              </div>
-
-              <div className="form-group" style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '10px 14px', borderRadius: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 2 }}>
-                  🛡️ Hak Akses Otoritas Guru:
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-concrete)', lineHeight: 1.4 }}>
-                  Guru memiliki otoritas penuh untuk memantau pengerjaan ujian siswa realtime, melihat data sesama guru, dan <strong>membuka kunci layar ujian siswa (remote unlock)</strong> saat siswa melanggar batas keluar.
-                </div>
               </div>
 
               <div className="modal-footer" style={{ marginTop: 10 }}>
