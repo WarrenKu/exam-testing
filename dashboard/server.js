@@ -204,6 +204,46 @@ const activeTokens = new Map(); // token -> user details
 const students = new Map(); // key: deviceId, value: StudentData
 const sseClients = new Set(); // SSE connected response streams
 
+// Realtime Teacher Presence (Online / Offline Detection)
+// Key: uppercase teacher code, ID, or 'SUPERADMIN' -> { lastHeartbeat, user }
+const activeTeacherPresence = new Map();
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return 'Belum pernah';
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return 'Baru saja';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} menit lalu`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} jam lalu`;
+  return `${Math.floor(diffSec / 86400)} hari lalu`;
+}
+
+function broadcastTeachersPresence() {
+  const now = Date.now();
+  for (const [key, p] of activeTeacherPresence.entries()) {
+    if (now - p.lastHeartbeat > 25000) {
+      activeTeacherPresence.delete(key);
+    }
+  }
+  const onlineKeys = Array.from(activeTeacherPresence.keys());
+  broadcast({ type: 'TEACHERS_PRESENCE_UPDATE', onlineKeys });
+}
+
+// Periodic presence cleanup: expire teachers inactive for >25 seconds
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  for (const [key, p] of activeTeacherPresence.entries()) {
+    if (now - p.lastHeartbeat > 25000) {
+      activeTeacherPresence.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) {
+    const onlineKeys = Array.from(activeTeacherPresence.keys());
+    broadcast({ type: 'TEACHERS_PRESENCE_UPDATE', onlineKeys });
+  }
+}, 8000);
+
 // Realtime Announcement Broadcasts (Per-student or Mass All-Students)
 // activeBroadcast: { id, title, message, target: 'all' | deviceId, timestamp, expiresAt }
 let activeBroadcast = null;
@@ -340,6 +380,12 @@ async function requestHandler(req, res) {
         isSuperAdmin: true,
       };
       activeTokens.set(token, superAdminUser);
+      activeTeacherPresence.set('SUPERADMIN', {
+        lastHeartbeat: Date.now(),
+        user: superAdminUser,
+      });
+      broadcastTeachersPresence();
+
       return sendJson(res, 200, {
         success: true,
         token,
@@ -375,7 +421,15 @@ async function requestHandler(req, res) {
           isSuperAdmin: false,
         };
         activeTokens.set(token, teacherUser);
-        teacher.lastLogin = 'Baru saja';
+        
+        const teacherKey = (teacher.code || teacher.id).toUpperCase();
+        activeTeacherPresence.set(teacherKey, {
+          lastHeartbeat: Date.now(),
+          user: teacherUser,
+        });
+        teacher.lastLoginTimestamp = Date.now();
+        teacher.lastLogin = 'Sedang Aktif';
+        broadcastTeachersPresence();
 
         return sendJson(res, 200, {
           success: true,
@@ -386,6 +440,44 @@ async function requestHandler(req, res) {
     }
 
     return sendJson(res, 401, { success: false, message: 'Kode Guru atau Password salah!' });
+  }
+
+  // 1b. Realtime Logout
+  if (pathname === '/api/logout' && req.method === 'POST') {
+    const auth = req.headers['authorization'] || '';
+    const token = auth.replace(/^Bearer\s+/i, '').trim();
+    const user = activeTokens.get(token);
+    if (user) {
+      const key = (user.isSuperAdmin ? 'SUPERADMIN' : (user.code || user.id || '')).toUpperCase();
+      activeTeacherPresence.delete(key);
+      activeTokens.delete(token);
+
+      const teacher = staffUsers.find((u) => u.id === user.id || (u.code && u.code.toUpperCase() === key));
+      if (teacher) {
+        teacher.lastLoginTimestamp = Date.now();
+        teacher.lastLogin = 'Baru saja';
+      }
+      broadcastTeachersPresence();
+    }
+    return sendJson(res, 200, { success: true, message: 'Berhasil logout' });
+  }
+
+  // 1c. Teacher / User Realtime Heartbeat (Keep-alive presence)
+  if (pathname === '/api/teachers/heartbeat' && req.method === 'POST') {
+    const auth = req.headers['authorization'] || '';
+    const token = auth.replace(/^Bearer\s+/i, '').trim();
+    const user = activeTokens.get(token);
+    if (!user) {
+      return sendJson(res, 401, { error: 'Unauthorized' });
+    }
+    const key = (user.isSuperAdmin ? 'SUPERADMIN' : (user.code || user.id || '')).toUpperCase();
+    if (key) {
+      activeTeacherPresence.set(key, {
+        lastHeartbeat: Date.now(),
+        user,
+      });
+    }
+    return sendJson(res, 200, { success: true, isOnline: true });
   }
 
   // 2. Auth Check
@@ -587,7 +679,11 @@ async function requestHandler(req, res) {
       'Connection': 'keep-alive',
       'Access-Control-Allow-Origin': '*',
     });
-    res.write(`data: ${JSON.stringify({ type: 'INIT', students: Array.from(students.values()) })}\n\n`);
+    res.write(`data: ${JSON.stringify({ 
+      type: 'INIT', 
+      students: Array.from(students.values()),
+      onlineTeachers: Array.from(activeTeacherPresence.keys())
+    })}\n\n`);
     sseClients.add(res);
 
     req.on('close', () => {
@@ -615,7 +711,21 @@ async function requestHandler(req, res) {
     await syncGoogleTeachers();
     const viewRole = urlObj.searchParams.get('viewRole') || req.headers['x-view-role'] || 'superadmin';
     const isSuperAdminView = viewRole === 'superadmin';
-    const list = isSuperAdminView ? staffUsers : staffUsers.filter(u => !u.isSuperAdmin);
+    const rawList = isSuperAdminView ? staffUsers : staffUsers.filter(u => !u.isSuperAdmin);
+
+    const now = Date.now();
+    const list = rawList.map((u) => {
+      const key = (u.isSuperAdmin ? 'SUPERADMIN' : (u.code || u.id || '')).toUpperCase();
+      const session = activeTeacherPresence.get(key);
+      const isOnline = Boolean(session && (now - session.lastHeartbeat <= 25000));
+      return {
+        ...u,
+        isOnline,
+        presence: isOnline ? 'Online' : 'Offline',
+        lastLogin: isOnline ? 'Sedang Aktif' : (u.lastLoginTimestamp ? formatTimeAgo(u.lastLoginTimestamp) : (u.lastLogin && u.lastLogin !== 'Sedang Aktif' ? u.lastLogin : 'Belum pernah')),
+      };
+    });
+
     return sendJson(res, 200, {
       success: true,
       viewRole,

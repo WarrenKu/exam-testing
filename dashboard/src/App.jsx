@@ -263,6 +263,35 @@ export default function App() {
         const payload = JSON.parse(event.data);
         if (payload.type === 'INIT' || payload.type === 'SYNC_STUDENTS') {
           setStudents(payload.students || []);
+          if (payload.onlineTeachers) {
+            const onlineSet = new Set(payload.onlineTeachers.map((k) => String(k).toUpperCase()));
+            setTeachers((prev) =>
+              prev.map((t) => {
+                const key = (t.isSuperAdmin ? 'SUPERADMIN' : (t.code || t.id || '')).toUpperCase();
+                const isOnline = onlineSet.has(key);
+                return {
+                  ...t,
+                  isOnline,
+                  presence: isOnline ? 'Online' : 'Offline',
+                  lastLogin: isOnline ? 'Sedang Aktif' : (t.lastLogin && t.lastLogin !== 'Sedang Aktif' ? t.lastLogin : 'Belum pernah'),
+                };
+              })
+            );
+          }
+        } else if (payload.type === 'TEACHERS_PRESENCE_UPDATE') {
+          const onlineSet = new Set((payload.onlineKeys || []).map((k) => String(k).toUpperCase()));
+          setTeachers((prev) =>
+            prev.map((t) => {
+              const key = (t.isSuperAdmin ? 'SUPERADMIN' : (t.code || t.id || '')).toUpperCase();
+              const isOnline = onlineSet.has(key);
+              return {
+                ...t,
+                isOnline,
+                presence: isOnline ? 'Online' : 'Offline',
+                lastLogin: isOnline ? 'Sedang Aktif' : (t.lastLogin && t.lastLogin !== 'Sedang Aktif' ? t.lastLogin : 'Belum pernah'),
+              };
+            })
+          );
         } else if (payload.type === 'STUDENT_UPDATE' && payload.student) {
           setStudents((prev) => {
             const idx = prev.findIndex((s) => s.deviceId === payload.student.deviceId);
@@ -344,6 +373,22 @@ export default function App() {
     }
   }, [token, viewAsRole]);
 
+  // Realtime Teacher Presence Heartbeat (Keep presence alive every 10 seconds while tab is open)
+  useEffect(() => {
+    if (!token) return;
+    const sendHeartbeat = async () => {
+      try {
+        await fetch('/api/teachers/heartbeat', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (_) {}
+    };
+    sendHeartbeat();
+    const hbTimer = setInterval(sendHeartbeat, 10000);
+    return () => clearInterval(hbTimer);
+  }, [token]);
+
   // Auto Stale Cleanup: Only auto-purge after 20 MINUTES (1,200,000 ms) without signal
   useEffect(() => {
     const timer = setInterval(() => {
@@ -385,7 +430,15 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      if (token) {
+        await fetch('/api/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch (_) {}
     localStorage.removeItem('ujiankita_superadmin_token');
     localStorage.removeItem('ujiankita_user');
     setToken('');
@@ -688,7 +741,9 @@ export default function App() {
         return false;
       }
 
-      // Role filter
+      // Role & Presence filter
+      if (userRoleFilter === 'online' && !t.isOnline) return false;
+      if (userRoleFilter === 'offline' && t.isOnline) return false;
       if (userRoleFilter === 'guru' && !t.role.toLowerCase().includes('guru')) return false;
       if (userRoleFilter === 'proktor' && !t.role.toLowerCase().includes('proktor')) return false;
       if (userRoleFilter === 'admin' && !t.role.toLowerCase().includes('admin kurikulum')) return false;
@@ -716,14 +771,18 @@ export default function App() {
     let guru = 0,
       proktor = 0,
       admin = 0,
-      dev = 0;
+      dev = 0,
+      online = 0,
+      offline = 0;
     for (const t of visibleTeachers) {
+      if (t.isOnline) online++;
+      else offline++;
       if (t.isSuperAdmin) dev++;
       else if (t.role.toLowerCase().includes('admin kurikulum')) admin++;
       else if (t.role.toLowerCase().includes('proktor')) proktor++;
       else guru++;
     }
-    return { total, guru, proktor, admin, dev };
+    return { total, guru, proktor, admin, dev, online, offline };
   }, [teachers, viewAsRole]);
 
   // Shared Admin Menu Items (Used in Desktop topbar and Mobile bottom navbar)
@@ -1647,6 +1706,20 @@ export default function App() {
                     Semua ({teacherRoleCounts.total})
                   </button>
                   <button
+                    className={`role-filter-chip ${userRoleFilter === 'online' ? 'active' : ''}`}
+                    onClick={() => setUserRoleFilter('online')}
+                  >
+                    <span className="presence-dot-online" style={{ width: 6, height: 6 }}></span>
+                    <span>Online ({teacherRoleCounts.online})</span>
+                  </button>
+                  <button
+                    className={`role-filter-chip ${userRoleFilter === 'offline' ? 'active' : ''}`}
+                    onClick={() => setUserRoleFilter('offline')}
+                  >
+                    <span className="presence-dot-offline" style={{ width: 6, height: 6 }}></span>
+                    <span>Offline ({teacherRoleCounts.offline})</span>
+                  </button>
+                  <button
                     className={`role-filter-chip ${userRoleFilter === 'guru' ? 'active' : ''}`}
                     onClick={() => setUserRoleFilter('guru')}
                   >
@@ -1689,8 +1762,8 @@ export default function App() {
                       <th>Role / Peran</th>
                       <th>MATA PELAJARAN</th>
                       <th>Otoritas & Hak Akses</th>
-                      <th>Status Akun</th>
-                      <th>Terakhir Login</th>
+                      <th>Status Realtime</th>
+                      <th>Terakhir Login / Aktif</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
@@ -1776,22 +1849,31 @@ export default function App() {
                               </div>
                             </td>
 
-                            {/* Status Akun (Interactive Toggle) */}
+                            {/* Status Realtime Presence & Status Akun */}
                             <td>
-                              <button
-                                className={`status-toggle-pill ${t.status === 'Aktif' ? 'active' : 'inactive'}`}
-                                onClick={() => handleToggleTeacherStatus(t.id)}
-                                title={viewAsRole !== 'superadmin' ? 'Hanya Super-Admin yang dapat mengubah status' : (isDev ? 'Status Super-Admin tidak dapat diubah' : 'Klik untuk mengubah status')}
-                                disabled={isDev || viewAsRole !== 'superadmin'}
-                              >
-                                <span className="status-dot"></span>
-                                <span>{t.status}</span>
-                              </button>
+                              <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+                                {t.isOnline ? (
+                                  <span className="teacher-presence-pill online" title="Guru sedang membuka dashboard ujian">
+                                    <span className="presence-dot-online"></span>
+                                    <span>Online</span>
+                                  </span>
+                                ) : (
+                                  <span className="teacher-presence-pill offline" title="Guru belum/tidak sedang login">
+                                    <span className="presence-dot-offline"></span>
+                                    <span>Offline</span>
+                                  </span>
+                                )}
+                                {t.status === 'Nonaktif' && (
+                                  <span className="teacher-account-blocked" title="Akun ini dinonaktifkan oleh administrator">
+                                    (Dibekukan)
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
-                            {/* Terakhir Login */}
-                            <td style={{ fontSize: 12, color: 'var(--text-concrete)' }}>
-                              {t.lastLogin || 'Hari ini'}
+                            {/* Terakhir Login / Sesi Aktif */}
+                            <td style={{ fontSize: 12, color: t.isOnline ? '#38BDF8' : 'var(--text-concrete)', fontWeight: t.isOnline ? 700 : 400 }}>
+                              {t.isOnline ? '🟢 Sedang Aktif' : (t.lastLogin || 'Belum pernah')}
                             </td>
 
                             {/* Aksi */}
@@ -2275,18 +2357,18 @@ export default function App() {
               <Panel isGlass={liquidGlassEnabled} className="quad-cell">
                 <div className="quad-label">
                   <Key size={16} />
-                  <span>Status Akun</span>
+                  <span>Status Realtime</span>
                 </div>
                 <div
                   className="quad-value"
                   style={{
                     fontSize: 15,
-                    color: selectedTeacherForDetail.status === 'Aktif' ? 'var(--status-green)' : 'var(--text-concrete)',
+                    color: selectedTeacherForDetail.isOnline ? '#38BDF8' : 'var(--text-concrete)',
                   }}
                 >
-                  {selectedTeacherForDetail.status}
+                  {selectedTeacherForDetail.isOnline ? '🟢 Online' : '⚪ Offline'}
                 </div>
-                <div className="quad-desc">Kesiapan Login Petugas</div>
+                <div className="quad-desc">Aktivitas Sesi Dashboard</div>
               </Panel>
             </div>
 
@@ -2300,8 +2382,14 @@ export default function App() {
                 <strong style={{ color: '#0284C7' }}>{selectedTeacherForDetail.privilege || 'Monitoring Siswa & Buka Kunci Layar'}</strong>
               </div>
               <div className="info-stat-row">
-                <span>Terakhir Login</span>
-                <strong>{selectedTeacherForDetail.lastLogin || 'Hari ini'}</strong>
+                <span>Status Keaktifan Akun</span>
+                <strong style={{ color: selectedTeacherForDetail.status === 'Aktif' ? '#38BDF8' : '#EF4444' }}>
+                  {selectedTeacherForDetail.status === 'Aktif' ? 'Akun Diizinkan (Aktif)' : 'Akun Dinonaktifkan (Dibekukan)'}
+                </strong>
+              </div>
+              <div className="info-stat-row">
+                <span>Terakhir Login / Aktif</span>
+                <strong>{selectedTeacherForDetail.isOnline ? 'Sedang Aktif' : (selectedTeacherForDetail.lastLogin || 'Belum pernah')}</strong>
               </div>
               <div className="info-stat-row">
                 <span>Username Sistem</span>
