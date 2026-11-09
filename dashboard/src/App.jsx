@@ -453,9 +453,9 @@ export default function App() {
 
   // Clear demo / reset
   const handleResetSession = () => {
-    if (confirm('Bersihkan semua siswa simulasi dan reset sesi monitoring?')) {
+    if (confirm('Bersihkan seluruh data sesi monitoring ujian saat ini?')) {
       handleToggleSimulator(false);
-      setStudents((prev) => prev.filter((s) => !s.deviceId.startsWith('SIM-')));
+      setStudents([]);
     }
   };
 
@@ -708,9 +708,13 @@ export default function App() {
       items.push(
         { label: 'Pengaturan Sistem', icon: <Sliders size={15} />, onSelect: () => setActiveTab('settings') },
         'separator',
-        { label: 'Bersihkan Sesi / Demo', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true }
+        { label: 'Bersihkan Sesi', icon: <Trash2 size={15} />, onSelect: handleResetSession, destructive: true }
       );
     }
+    items.push(
+      'separator',
+      { label: 'Logout', icon: <LogOut size={15} />, onSelect: handleLogout, destructive: true }
+    );
     return items;
   }, [students, viewAsRole]);
 
